@@ -27,26 +27,22 @@ app.get('/api/health',(q,r)=>r.json({ok:true,name:'Nova'}));
 const schoolCache={at:0,data:[]};
 async function fetchSchoolMaster(){
   if(Date.now()-schoolCache.at<3600000&&schoolCache.data.length)return schoolCache.data;
-  const urls=[
-    'https://school.teraren.com/schools.json?active=true',
-    'https://school.teraren.com/schools.json'
-  ];
-  let raw=null;
-  for(const url of urls){
-    try{
-      const r=await fetch(url,{headers:{accept:'application/json'}});
-      if(r.ok){raw=await r.json();break}
-    }catch{}
-  }
-  if(!Array.isArray(raw))throw new Error('学校データ取得失敗');
-  schoolCache.data=raw.map(x=>({
-    id:String(x.code||x.school_code||x.id||''),
-    name:String(x.name||x.school_name||'').trim(),
-    schoolType:String(x.school_type||x.type||''),
-    location:String(x.location||x.prefecture||x.address||'').trim()
-  })).filter(x=>x.id&&x.name&&(
-    /中学校|高等学校|中等教育学校|中学.*高校|高校.*中学/.test(x.name) ||
-    ['C1','C2','D1','D2'].includes(x.schoolType)
+  const r=await fetch('https://school.teraren.com/schools.json?active=true',{headers:{accept:'application/json'}});
+  if(!r.ok)throw new Error('学校データ取得失敗');
+  const raw=await r.json();
+  if(!Array.isArray(raw))throw new Error('学校データ形式不正');
+  schoolCache.data=raw.map(x=>{
+    const type=String(x.school_type||x.type||'');
+    return {
+      id:String(x.code||x.school_code||x.id||''),
+      name:String(x.name||x.school_name||'').trim(),
+      schoolType:type,
+      location:String(x.location||x.prefecture||x.address||'').trim()
+    };
+  }).filter(x=>x.id&&x.name&&(
+    ['C1','C2','D1','D2'].includes(x.schoolType) ||
+    /中学校|義務教育学校|中等教育学校|高等学校/.test(x.schoolType) ||
+    /中学校|中学|高等学校|高校/.test(x.name)
   ));
   schoolCache.at=Date.now();
   return schoolCache.data;
@@ -56,7 +52,7 @@ app.get('/api/schools',async(req,res)=>{
   try{
     const all=await fetchSchoolMaster();
     const result=keyword
-      ? all.filter(x=>(x.name+' '+x.location).toLowerCase().includes(keyword)).slice(0,30)
+      ? all.filter(x=>(x.name+' '+x.location+' '+x.schoolType).toLowerCase().includes(keyword)).slice(0,30)
       : all.slice(0,30);
     return res.json(result);
   }catch(e){
