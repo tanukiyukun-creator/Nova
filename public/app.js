@@ -17,7 +17,7 @@ async function loginSchoolSuggest(){
   loginSchoolTimer=setTimeout(async()=>{
     try{
       const a=await api('/api/schools?q='+encodeURIComponent(q));
-      box.innerHTML=a.slice(0,8).map(x=>`<button type="button" class="school-option" onpointerdown="event.preventDefault();pickLoginSchool(${JSON.stringify(x.name)})"><b>${esc(x.name)}</b>${x.location?`<small>${esc(x.location)}</small>`:''}</button>`).join('')||'<div class="school-noresult">候補が見つかりません</div>';
+      box.innerHTML=a.slice(0,8).map(x=>`<button type="button" class="school-option" onclick="pickLoginSchool(${JSON.stringify(x.name)})"><b>${esc(x.name)}</b>${x.location?`<small>${esc(x.location)}</small>`:''}</button>`).join('')||'<div class="school-noresult">候補が見つかりません</div>';
     }catch{box.innerHTML='<div class="school-noresult">学校候補を取得できません</div>'}
   },180);
 }
@@ -39,7 +39,7 @@ async function schoolSuggest(){
   schoolTimer=setTimeout(async()=>{
     try{
       const a=await api('/api/schools?q='+encodeURIComponent(q));
-      box.innerHTML=a.slice(0,8).map(x=>`<button type="button" class="school-option" onpointerdown="event.preventDefault();pickSchool(${JSON.stringify(x.id)},${JSON.stringify(x.name)})"><b>${esc(x.name)}</b>${x.location?`<small>${esc(x.location)}</small>`:''}</button>`).join('')||'<div class="school-noresult">候補が見つかりません</div>';
+      box.innerHTML=a.slice(0,8).map(x=>`<button type="button" class="school-option" onclick="pickSchool(${JSON.stringify(x.id)},${JSON.stringify(x.name)})"><b>${esc(x.name)}</b>${x.location?`<small>${esc(x.location)}</small>`:''}</button>`).join('')||'<div class="school-noresult">候補が見つかりません</div>';
     }catch{box.innerHTML='<div class="school-noresult">学校候補を取得できません</div>'}
   },180);
 }
