@@ -47,12 +47,12 @@ async function register(e){
   e.preventDefault();
   const f=new FormData(e.target);
   const school=$('#schoolInput');
-  if(!school.dataset.schoolId)return toast('学校名は候補から選択してください');
+  if(!school.value.trim())return toast('学校名を入力してください');
   if(f.get('password')!==f.get('password2'))return toast('パスワードが一致しません');
   const className=f.get('classPreset')==='custom'?String(f.get('classNameCustom')||'').trim():f.get('classPreset');
   if(!className)return toast('クラスを選択または入力してください');
   const body={
-    schoolId:school.dataset.schoolId,
+    schoolId:school.dataset.schoolId||school.value.trim(),
     schoolName:school.value.trim(),
     grade:f.get('grade'),
     className,
