@@ -58,11 +58,18 @@ app.get('/api/schools',async(req,res)=>{
     ...db.schools.map(x=>({id:x.masterId||x.id,name:x.name,location:x.location||'',schoolType:x.schoolType||'',source:'registered'}))
   ];
   const localMatches=local.filter(x=>x.name.includes(keyword));
-  let external=[];
-  try{ external=await searchSchoolMaster(keyword); }catch{}
-  const merged=[...localMatches,...external];
   const seen=new Set();
-  return res.json(merged.filter(x=>x.name&&!seen.has(x.name)&&(seen.add(x.name))).slice(0,50));
+  const uniqueLocal=localMatches.filter(x=>x.name&&!seen.has(x.name)&&(seen.add(x.name))).slice(0,50);
+  if(uniqueLocal.length)return res.json(uniqueLocal);
+  try{
+    const external=await Promise.race([
+      searchSchoolMaster(keyword),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),2500))
+    ]);
+    return res.json(external.filter(x=>x.name&&!seen.has(x.name)&&(seen.add(x.name))).slice(0,50));
+  }catch{
+    return res.json([]);
+  }
 });
 app.post('/api/register',(req,res)=>{try{const db=load();const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon}=req.body;const displayName=[lastName,firstName].filter(Boolean).join(' ').trim();if(!schoolName||!schoolId||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});if(!['1','2','3'].includes(String(grade)))return res.status(400).json({error:'学年は1〜3から選択してください'});if(!/^\\d+$/.test(String(attendanceNo))||Number(attendanceNo)<1)return res.status(400).json({error:'出席番号は1以上の数字で入力してください'});if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});if(!/^[^<>]{1,40}$/.test(lastName)||!/^[^<>]{1,40}$/.test(firstName))return res.status(400).json({error:'氏名を正しく入力してください'});if(icon&&icon.length>6*1024*1024)return res.status(400).json({error:'写真のサイズが大きすぎます'});let school=db.schools.find(x=>x.masterId===schoolId||x.id===schoolId||x.name===schoolName);if(!school){school={id:id(),masterId:String(schoolId),name:schoolName,grades:[]};db.schools.push(school)}const exists=db.users.find(u=>u.schoolId===school.id&&u.grade===String(grade)&&u.className===className&&String(u.attendanceNo)===String(attendanceNo));if(exists)return res.status(409).json({error:'この学校・学年・クラス・出席番号はすでに登録されています'});const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:String(className).trim(),attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true}};db.users.push(u);save(db);res.json({token:token(u),user:pub(u)})}catch(e){res.status(500).json({error:'登録処理に失敗しました'})}});
 app.post('/api/login',(req,res)=>{
