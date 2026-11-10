@@ -17,7 +17,7 @@ async function loginSchoolSuggest(){
   loginSchoolTimer=setTimeout(async()=>{
     try{
       const a=await api('/api/schools?q='+encodeURIComponent(q));
-      box.innerHTML=a.slice(0,8).map(x=>`<button type="button" class="school-option" onclick="pickLoginSchool(${JSON.stringify(x.name)})"><b>${esc(x.name)}</b>${x.location?`<small>${esc(x.location)}</small>`:''}</button>`).join('')||'<div class="school-noresult">候補が見つかりません</div>';
+      box.innerHTML=a.slice(0,8).map(x=>`<button type="button" class="school-option" data-school-name="${esc(x.name)}"><b>${esc(x.name)}</b>${x.location?`<small>${esc(x.location)}</small>`:''}</button>`).join('')||'<div class="school-noresult">候補が見つかりません</div>';
     }catch{box.innerHTML='<div class="school-noresult">学校候補を取得できません</div>'}
   },180);
 }
@@ -39,7 +39,7 @@ async function schoolSuggest(){
   schoolTimer=setTimeout(async()=>{
     try{
       const a=await api('/api/schools?q='+encodeURIComponent(q));
-      box.innerHTML=a.slice(0,8).map(x=>`<button type="button" class="school-option" onclick="pickSchool(${JSON.stringify(x.id)},${JSON.stringify(x.name)})"><b>${esc(x.name)}</b>${x.location?`<small>${esc(x.location)}</small>`:''}</button>`).join('')||'<div class="school-noresult">候補が見つかりません</div>';
+      box.innerHTML=a.slice(0,8).map(x=>`<button type="button" class="school-option" data-school-id="${esc(x.id)}" data-school-name="${esc(x.name)}"><b>${esc(x.name)}</b>${x.location?`<small>${esc(x.location)}</small>`:''}</button>`).join('')||'<div class="school-noresult">候補が見つかりません</div>';
     }catch{box.innerHTML='<div class="school-noresult">学校候補を取得できません</div>'}
   },180);
 }
@@ -156,4 +156,13 @@ function fcNext(){const x=window.fc;x.i=(x.i+1)%x.a.length;$('#fc').textContent=
 function quiz(id2){const a=window.NOVA_BOOKS?.[id2]||[];let i=0;function q(){const x=a[i++%a.length];const opts=[x,...a.slice(i,i+3)].sort(()=>Math.random()-.5);$('#main').innerHTML=`<div class="glass card"><div class="h">4 CHOICE</div><div class="big">${esc(x.q)}</div><div class="stack">${opts.map(o=>`<button class="btn alt" onclick="toast(${JSON.stringify(o.a===x.a?'正解！':'不正解')});${o.a===x.a?'':'quiz(\''+id2+'\')'}">${esc(o.a)}</button>`).join('')}</div></div>`}q()}
 function spelling(id2){const a=window.NOVA_BOOKS?.[id2]||[];let x=a[Math.floor(Math.random()*a.length)];$('#main').innerHTML=`<div class="glass card"><div class="h">SPELLING</div><div class="big">${esc(x.a)}</div><input id="ans" class="input" placeholder="英単語を入力"><button class="btn" onclick="toast($('#ans').value.trim().toLowerCase()===${JSON.stringify(x.q.toLowerCase())}?'正解！':'不正解')">答え合わせ</button></div>`}
 async function settings(m){m.innerHTML=`<div class="grid"><section class="glass card span6"><div class="h">PROFILE</div><div class="row"><div class="avatar">${esc(me.icon)}</div><div><b>${esc(me.displayName)}</b><div class="sub">${esc(me.schoolName)} / ${esc(me.grade)}年 ${esc(me.className)}組</div></div></div><form class="stack" onsubmit="saveProfile(event)" style="margin-top:15px"><input class="input" name="displayName" value="${esc(me.displayName)}"><input class="input" name="icon" value="${esc(me.icon)}"><button class="btn">保存</button></form></section><section class="glass card span6"><div class="h">NOTIFICATION</div><label><input id="notif" type="checkbox" ${me.settings?.notifications?'checked':''}> プッシュ通知</label><br><label><input id="call" type="checkbox" ${me.settings?.callSound?'checked':''}> 通話着信音</label><p class="sub">ブラウザ/端末側の通知許可も必要です。</p></section></div>`}async function saveProfile(e){e.preventDefault();const f=new FormData(e.target);me=await api('/api/me',{method:'PATCH',body:JSON.stringify({displayName:f.get('displayName'),icon:f.get('icon'),settings:{notifications:$('#notif')?.checked??true,callSound:$('#call')?.checked??true}})});localStorage.novaUser=JSON.stringify(me);toast('保存しました');render()}
+document.addEventListener('click',e=>{
+  const b=e.target.closest?.('.school-option');
+  if(!b)return;
+  e.preventDefault();
+  e.stopPropagation();
+  const name=b.dataset.schoolName||b.textContent.trim();
+  if(b.dataset.schoolId!==undefined)pickSchool(b.dataset.schoolId,name);
+  else pickLoginSchool(name);
+},true);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});render();
