@@ -24,42 +24,43 @@ function notify(db,userId,type,title,body){db.notifications.unshift({id:id(),use
 function sameGroup(a,b){return a.schoolId===b.schoolId&&a.grade===b.grade&&a.className===b.className}
 
 app.get('/api/health',(q,r)=>r.json({ok:true,name:'Nova'}));
-const schoolCache={at:0,data:[]};
-async function fetchSchoolMaster(){
-  if(Date.now()-schoolCache.at<3600000&&schoolCache.data.length)return schoolCache.data;
-  const r=await fetch('https://school.teraren.com/schools.json?active=true',{headers:{accept:'application/json'}});
+const schoolCache={};
+async function searchSchoolMaster(keyword){
+  const q=String(keyword||'').trim();
+  if(!q)return [];
+  const url='https://school.teraren.com/schools.json?s='+encodeURIComponent(q);
+  const r=await fetch(url,{headers:{accept:'application/json'},signal:AbortSignal.timeout(10000)});
   if(!r.ok)throw new Error('学校データ取得失敗');
   const raw=await r.json();
   if(!Array.isArray(raw))throw new Error('学校データ形式不正');
-  schoolCache.data=raw.map(x=>{
+  return raw.map(x=>{
+    const code=String(x.code||x.school_code||x.id||'');
     const type=String(x.school_type||x.type||'');
+    const name=String(x.name||x.school_name||'').trim();
     return {
-      id:String(x.code||x.school_code||x.id||''),
-      name:String(x.name||x.school_name||'').trim(),
-      schoolType:type,
+      id:code,
+      name,
+      schoolType:type || (code.startsWith('C')?'中学校':code.startsWith('D')?'高等学校':''),
       location:String(x.location||x.prefecture||x.address||'').trim()
     };
   }).filter(x=>x.id&&x.name&&(
-    ['C1','C2','D1','D2'].includes(x.schoolType) ||
-    /中学校|義務教育学校|中等教育学校|高等学校/.test(x.schoolType) ||
-    /中学校|中学|高等学校|高校/.test(x.name)
-  ));
-  schoolCache.at=Date.now();
-  return schoolCache.data;
+    x.id.startsWith('C')||x.id.startsWith('D')||
+    /中学校|中学|高等学校|高校|中等教育学校|義務教育学校/.test(x.name)||
+    /中学校|高等学校|中等教育学校|義務教育学校/.test(x.schoolType)
+  )).slice(0,50);
 }
 app.get('/api/schools',async(req,res)=>{
-  const keyword=String(req.query.q||'').trim().toLowerCase();
+  const keyword=String(req.query.q||'').trim();
+  if(keyword.length<1)return res.json([]);
   try{
-    const all=await fetchSchoolMaster();
-    const result=keyword
-      ? all.filter(x=>(x.name+' '+x.location+' '+x.schoolType).toLowerCase().includes(keyword)).slice(0,30)
-      : all.slice(0,30);
+    const result=await searchSchoolMaster(keyword);
     return res.json(result);
   }catch(e){
     const db=load();
-    const result=db.schools.filter(x=>!keyword||String(x.name).toLowerCase().includes(keyword))
-      .map(x=>({id:x.id,name:x.name,location:'',schoolType:'',source:'registered'})).slice(0,30);
-    return res.json(result);
+    return res.json(db.schools
+      .filter(x=>String(x.name||'').includes(keyword))
+      .map(x=>({id:x.id,name:x.name,location:'',schoolType:'',source:'registered'}))
+      .slice(0,30));
   }
 });
 app.post('/api/register',(req,res)=>{try{const db=load();const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon}=req.body;const displayName=[lastName,firstName].filter(Boolean).join(' ').trim();if(!schoolName||!schoolId||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});if(!['1','2','3'].includes(String(grade)))return res.status(400).json({error:'学年は1〜3から選択してください'});if(!/^\\d+$/.test(String(attendanceNo))||Number(attendanceNo)<1)return res.status(400).json({error:'出席番号は1以上の数字で入力してください'});if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});if(!/^[^<>]{1,40}$/.test(lastName)||!/^[^<>]{1,40}$/.test(firstName))return res.status(400).json({error:'氏名を正しく入力してください'});if(icon&&icon.length>6*1024*1024)return res.status(400).json({error:'写真のサイズが大きすぎます'});let school=db.schools.find(x=>x.masterId===schoolId||x.id===schoolId||x.name===schoolName);if(!school){school={id:id(),masterId:String(schoolId),name:schoolName,grades:[]};db.schools.push(school)}const exists=db.users.find(u=>u.schoolId===school.id&&u.grade===String(grade)&&u.className===className&&String(u.attendanceNo)===String(attendanceNo));if(exists)return res.status(409).json({error:'この学校・学年・クラス・出席番号はすでに登録されています'});const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:String(className).trim(),attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true}};db.users.push(u);save(db);res.json({token:token(u),user:pub(u)})}catch(e){res.status(500).json({error:'登録処理に失敗しました'})}});
