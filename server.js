@@ -25,8 +25,48 @@ function sameGroup(a,b){return a.schoolId===b.schoolId&&a.grade===b.grade&&a.cla
 
 app.get('/api/health',(q,r)=>r.json({ok:true,name:'Nova'}));
 const schoolCache={at:0,data:[]};
-async function fetchSchoolMaster(){if(Date.now()-schoolCache.at<300000&&schoolCache.data.length)return schoolCache.data;const r=await fetch('https://school.teraren.com/schools.json?active=true');if(!r.ok)throw new Error('学校データ取得失敗');const a=await r.json();schoolCache.data=a.filter(x=>['C1','C2','D1','D2'].includes(x.school_type)).map(x=>({id:x.code,name:x.name,schoolType:x.school_type,postalCode:x.postal_code,location:x.location}));schoolCache.at=Date.now();return schoolCache.data}
-app.get('/api/schools',async(q,r)=>{try{const all=await fetchSchoolMaster();const keyword=String(q.query.q||'').trim().toLowerCase();const result=keyword?all.filter(x=>(x.name+' '+(x.location||'')).toLowerCase().includes(keyword)).slice(0,30):all.slice(0,30);r.json(result)}catch(e){const db=load();const keyword=String(q.query.q||'').trim().toLowerCase();r.json(db.schools.filter(x=>!keyword||x.name.toLowerCase().includes(keyword)).slice(0,30))}});app.post('/api/register',(req,res)=>{try{const db=load();const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon}=req.body;const displayName=[lastName,firstName].filter(Boolean).join(' ').trim();if(!schoolName||!schoolId||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});if(!['1','2','3'].includes(String(grade)))return res.status(400).json({error:'学年は1〜3から選択してください'});if(!/^\\d+$/.test(String(attendanceNo))||Number(attendanceNo)<1)return res.status(400).json({error:'出席番号は1以上の数字で入力してください'});if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});if(!/^[^<>]{1,40}$/.test(lastName)||!/^[^<>]{1,40}$/.test(firstName))return res.status(400).json({error:'氏名を正しく入力してください'});if(icon&&icon.length>6*1024*1024)return res.status(400).json({error:'写真のサイズが大きすぎます'});let school=db.schools.find(x=>x.masterId===schoolId||x.id===schoolId||x.name===schoolName);if(!school){school={id:id(),masterId:String(schoolId),name:schoolName,grades:[]};db.schools.push(school)}const exists=db.users.find(u=>u.schoolId===school.id&&u.grade===String(grade)&&u.className===className&&String(u.attendanceNo)===String(attendanceNo));if(exists)return res.status(409).json({error:'この学校・学年・クラス・出席番号はすでに登録されています'});const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:String(className).trim(),attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true}};db.users.push(u);save(db);res.json({token:token(u),user:pub(u)})}catch(e){res.status(500).json({error:'登録処理に失敗しました'})}});
+async function fetchSchoolMaster(){
+  if(Date.now()-schoolCache.at<3600000&&schoolCache.data.length)return schoolCache.data;
+  const urls=[
+    'https://school.teraren.com/schools.json?active=true',
+    'https://school.teraren.com/schools.json'
+  ];
+  let raw=null;
+  for(const url of urls){
+    try{
+      const r=await fetch(url,{headers:{accept:'application/json'}});
+      if(r.ok){raw=await r.json();break}
+    }catch{}
+  }
+  if(!Array.isArray(raw))throw new Error('学校データ取得失敗');
+  schoolCache.data=raw.map(x=>({
+    id:String(x.code||x.school_code||x.id||''),
+    name:String(x.name||x.school_name||'').trim(),
+    schoolType:String(x.school_type||x.type||''),
+    location:String(x.location||x.prefecture||x.address||'').trim()
+  })).filter(x=>x.id&&x.name&&(
+    /中学校|高等学校|中等教育学校|中学.*高校|高校.*中学/.test(x.name) ||
+    ['C1','C2','D1','D2'].includes(x.schoolType)
+  ));
+  schoolCache.at=Date.now();
+  return schoolCache.data;
+}
+app.get('/api/schools',async(req,res)=>{
+  const keyword=String(req.query.q||'').trim().toLowerCase();
+  try{
+    const all=await fetchSchoolMaster();
+    const result=keyword
+      ? all.filter(x=>(x.name+' '+x.location).toLowerCase().includes(keyword)).slice(0,30)
+      : all.slice(0,30);
+    return res.json(result);
+  }catch(e){
+    const db=load();
+    const result=db.schools.filter(x=>!keyword||String(x.name).toLowerCase().includes(keyword))
+      .map(x=>({id:x.id,name:x.name,location:'',schoolType:'',source:'registered'})).slice(0,30);
+    return res.json(result);
+  }
+});
+app.post('/api/register',(req,res)=>{try{const db=load();const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon}=req.body;const displayName=[lastName,firstName].filter(Boolean).join(' ').trim();if(!schoolName||!schoolId||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});if(!['1','2','3'].includes(String(grade)))return res.status(400).json({error:'学年は1〜3から選択してください'});if(!/^\\d+$/.test(String(attendanceNo))||Number(attendanceNo)<1)return res.status(400).json({error:'出席番号は1以上の数字で入力してください'});if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});if(!/^[^<>]{1,40}$/.test(lastName)||!/^[^<>]{1,40}$/.test(firstName))return res.status(400).json({error:'氏名を正しく入力してください'});if(icon&&icon.length>6*1024*1024)return res.status(400).json({error:'写真のサイズが大きすぎます'});let school=db.schools.find(x=>x.masterId===schoolId||x.id===schoolId||x.name===schoolName);if(!school){school={id:id(),masterId:String(schoolId),name:schoolName,grades:[]};db.schools.push(school)}const exists=db.users.find(u=>u.schoolId===school.id&&u.grade===String(grade)&&u.className===className&&String(u.attendanceNo)===String(attendanceNo));if(exists)return res.status(409).json({error:'この学校・学年・クラス・出席番号はすでに登録されています'});const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:String(className).trim(),attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true}};db.users.push(u);save(db);res.json({token:token(u),user:pub(u)})}catch(e){res.status(500).json({error:'登録処理に失敗しました'})}});
 app.post('/api/login',(req,res)=>{const db=load(); const {schoolName,lastName,firstName,password,displayName}=req.body; const composed=[lastName,firstName].filter(Boolean).join(' ').trim(); const candidates=[composed,displayName].filter(Boolean); const u=db.users.find(x=>x.schoolName===schoolName&&candidates.some(n=>x.displayName===n)); if(!u||!verify(password,u.passwordHash))return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'}); res.json({token:token(u),user:pub(u)})});
 app.post('/api/super/login',(req,res)=>{const code=String(req.body.code||''); const password=String(req.body.password||''); const expectedCode=process.env.NOVA_SUPER_CODE||'NOVA-FIRST-ADMIN'; const expectedPassword=process.env.NOVA_SUPER_PASSWORD||expectedCode; if(code!==expectedCode||password!==expectedPassword)return res.status(401).json({error:'管理者認証に失敗しました'}); const db=load(); let u=db.users.find(x=>x.role==='SUPER_ADMIN'&&x.id==='nova-super-admin'); if(!u){u={id:'nova-super-admin',schoolId:'nova-system',schoolName:'Nova System',grade:'0',className:'SYSTEM',attendanceNo:'',lastName:'Nova',firstName:'Super Admin',displayName:'Nova Super Admin',icon:'',passwordHash:hash(password),role:'SUPER_ADMIN',createdAt:Date.now(),settings:{notifications:true,callSound:true}};db.users.push(u);save(db)} res.json({token:token(u),user:pub(u)})});
 app.get('/api/me',auth,(req,res)=>res.json(pub(req.user)));
