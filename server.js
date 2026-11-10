@@ -1,0 +1,59 @@
+import express from 'express';
+import {createServer} from 'http';
+import {WebSocketServer} from 'ws';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import {fileURLToPath} from 'url';
+
+const __dirname=path.dirname(fileURLToPath(import.meta.url));
+const app=express(); const server=createServer(app); const wss=new WebSocketServer({server,path:'/ws'});
+app.use(express.json({limit:'2mb'})); app.use(express.static(path.join(__dirname,'public')));
+const DB=path.join(__dirname,'db.json');
+const empty={users:[],schools:[],messages:[],friends:[],posts:[],events:[],tasks:[],schedules:[],elections:[],notifications:[],calls:[]};
+function load(){if(!fs.existsSync(DB)) fs.writeFileSync(DB,JSON.stringify(empty,null,2)); return JSON.parse(fs.readFileSync(DB,'utf8'));}
+function save(db){fs.writeFileSync(DB,JSON.stringify(db,null,2));}
+function id(){return crypto.randomBytes(12).toString('hex')}
+function hash(p,s=crypto.randomBytes(16).toString('hex')){return `${s}:${crypto.scryptSync(p,s,64).toString('hex')}`}
+function verify(p,h){const [s,x]=h.split(':'); return crypto.timingSafeEqual(Buffer.from(x,'hex'),crypto.scryptSync(p,s,64))}
+function token(u){const raw=JSON.stringify({id:u.id,exp:Date.now()+1000*60*60*24*30}); const b=Buffer.from(raw).toString('base64url'); const sig=crypto.createHmac('sha256',process.env.NOVA_SECRET||'nova-dev-secret-change-me').update(b).digest('base64url'); return b+'.'+sig}
+function auth(req,res,next){const t=(req.headers.authorization||'').replace('Bearer ',''); try{const [b,s]=t.split('.'); const ok=crypto.timingSafeEqual(Buffer.from(s||''),Buffer.from(crypto.createHmac('sha256',process.env.NOVA_SECRET||'nova-dev-secret-change-me').update(b||'').digest('base64url'))); const p=JSON.parse(Buffer.from(b,'base64url')); if(!ok||p.exp<Date.now()) throw 0; const db=load(); req.user=db.users.find(x=>x.id===p.id); if(!req.user)throw 0; next()}catch{res.status(401).json({error:'認証が必要です'})}}
+function pub(u){const {passwordHash,...x}=u;return x}
+function notify(db,userId,type,title,body){db.notifications.unshift({id:id(),userId,type,title,body,read:false,createdAt:Date.now()});}
+function sameGroup(a,b){return a.schoolId===b.schoolId&&a.grade===b.grade&&a.className===b.className}
+
+app.get('/api/health',(q,r)=>r.json({ok:true,name:'Nova'}));
+app.get('/api/schools',(q,r)=>{const db=load(); const s=(q.query.q||'').trim().toLowerCase(); r.json(db.schools.filter(x=>!s||x.name.toLowerCase().includes(s)).slice(0,100));});
+app.post('/api/register',(req,res)=>{const db=load(); const {schoolId,schoolName,grade,className,attendanceNo,displayName,password,icon,superCode}=req.body; if(!schoolName||!grade||!className||!displayName||!password)return res.status(400).json({error:'必須項目があります'}); if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上'}); let school=db.schools.find(x=>x.id===schoolId||x.name===schoolName); if(!school){school={id:id(),name:schoolName,grades:[]};db.schools.push(school)} const exists=db.users.find(u=>u.schoolId===school.id&&u.grade===String(grade)&&u.className===className&&String(u.attendanceNo)===String(attendanceNo)); if(exists)return res.status(409).json({error:'同じ出席番号の登録があります'}); const isFirst=db.users.length===0; const role=isFirst&&superCode===(process.env.NOVA_SUPER_CODE||'NOVA-FIRST-ADMIN')?'SUPER_ADMIN':'STUDENT'; const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className,attendanceNo:String(attendanceNo||''),displayName,icon:icon||'◎',passwordHash:hash(password),role,createdAt:Date.now(),settings:{notifications:true,callSound:true}}; db.users.push(u); save(db); res.json({token:token(u),user:pub(u)});});
+app.post('/api/login',(req,res)=>{const db=load(); const {schoolName,displayName,password}=req.body; const u=db.users.find(x=>x.schoolName===schoolName&&x.displayName===displayName); if(!u||!verify(password,u.passwordHash))return res.status(401).json({error:'学校・表示名・パスワードを確認してください'}); res.json({token:token(u),user:pub(u)})});
+app.get('/api/me',auth,(req,res)=>res.json(pub(req.user)));
+app.patch('/api/me',auth,(req,res)=>{const db=load();const u=db.users.find(x=>x.id===req.user.id);Object.assign(u,{displayName:req.body.displayName??u.displayName,icon:req.body.icon??u.icon,settings:{...u.settings,...(req.body.settings||{})}});save(db);res.json(pub(u))});
+app.get('/api/users/search',auth,(req,res)=>{const db=load(),q=(req.query.q||'').toLowerCase();res.json(db.users.filter(u=>u.id!==req.user.id&&(!q||u.displayName.toLowerCase().includes(q))).slice(0,30).map(pub))});
+app.post('/api/friends/:id',auth,(req,res)=>{const db=load(); if(!db.users.some(u=>u.id===req.params.id))return res.status(404).end(); if(!db.friends.some(f=>f.a===req.user.id&&f.b===req.params.id)){db.friends.push({a:req.user.id,b:req.params.id,createdAt:Date.now()});save(db)} res.json({ok:true})});
+app.get('/api/friends',auth,(req,res)=>{const db=load();const ids=db.friends.filter(f=>f.a===req.user.id||f.b===req.user.id).map(f=>f.a===req.user.id?f.b:f.a);res.json(db.users.filter(u=>ids.includes(u.id)).map(pub))});
+app.get('/api/chats/:otherId',auth,(req,res)=>{const db=load();res.json(db.messages.filter(m=>(m.from===req.user.id&&m.to===req.params.otherId)||(m.from===req.params.otherId&&m.to===req.user.id)).slice(-200))});
+app.post('/api/chats/:otherId',auth,(req,res)=>{const db=load();const m={id:id(),from:req.user.id,to:req.params.otherId,text:String(req.body.text||''),replyTo:req.body.replyTo||null,createdAt:Date.now()};if(!m.text.trim())return res.status(400).end();db.messages.push(m);notify(db,m.to,'message','新しいメッセージ',`${req.user.displayName}からメッセージが届きました`);save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message',message:m}))});res.json(m)});
+app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifications.filter(n=>n.userId===req.user.id).slice(0,100))});
+app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
+function scope(req){return {schoolId:req.user.schoolId,grade:req.user.grade,className:req.user.className}}
+app.get('/api/class',(req,res)=>res.status(401).end());
+app.get('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.query.kind||'class';res.json(db.posts.filter(p=>p.kind===kind&&p.schoolId===s.schoolId&&(kind==='school'||p.grade===s.grade)&&(kind!=='class'||p.className===s.className)).slice(0,100))});
+app.post('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.body.kind||'class'; if(!canManage(req.user,kind))return res.status(403).json({error:'権限がありません'});const p={id:id(),...s,kind,title:req.body.title||'',body:req.body.body||'',authorId:req.user.id,createdAt:Date.now()};db.posts.unshift(p);save(db);res.json(p)});
+function canManage(u,kind){if(u.role==='SUPER_ADMIN'||u.role==='SCHOOL_ADMIN')return true;if(kind==='grade')return ['GRADE_ADMIN'].includes(u.role);if(kind==='class')return ['CLASS_ADMIN','GRADE_ADMIN'].includes(u.role);return false}
+app.get('/api/events',auth,(req,res)=>{const db=load(),s=scope(req);res.json(db.events.filter(e=>e.schoolId===s.schoolId&&(e.grade==null||e.grade===s.grade)).sort((a,b)=>a.date.localeCompare(b.date)))});
+app.post('/api/events',auth,(req,res)=>{if(!['SUPER_ADMIN','SCHOOL_ADMIN'].includes(req.user.role))return res.status(403).end();const db=load(),s=scope(req);const e={id:id(),...s,title:req.body.title,date:req.body.date,place:req.body.place||'',body:req.body.body||''};db.events.push(e);db.users.filter(u=>u.schoolId===s.schoolId&&(e.grade==null||u.grade===e.grade)).forEach(u=>notify(db,u.id,'event','学校行事',e.title));save(db);res.json(e)});
+app.get('/api/tasks',auth,(req,res)=>{const db=load(),s=scope(req);res.json(db.tasks.filter(t=>t.schoolId===s.schoolId&&t.grade===s.grade&&t.className===s.className).sort((a,b)=>a.dueAt-b.dueAt))});
+app.post('/api/tasks',auth,(req,res)=>{if(!['SUPER_ADMIN','SCHOOL_ADMIN','GRADE_ADMIN','CLASS_ADMIN'].includes(req.user.role))return res.status(403).end();const db=load(),s=scope(req);const t={id:id(),...s,subject:req.body.subject,title:req.body.title,detail:req.body.detail||'',dueAt:req.body.dueAt||null,method:req.body.method||'',createdAt:Date.now()};db.tasks.push(t);db.users.filter(u=>sameGroup(u,req.user)).forEach(u=>notify(db,u.id,'task','課題が追加されました',t.title));save(db);res.json(t)});
+app.get('/api/schedule',auth,(req,res)=>{const db=load(),s=scope(req);res.json(db.schedules.filter(x=>x.schoolId===s.schoolId&&x.grade===s.grade&&x.className===s.className))});
+app.post('/api/schedule',auth,(req,res)=>{if(!['SUPER_ADMIN','SCHOOL_ADMIN','GRADE_ADMIN','CLASS_ADMIN'].includes(req.user.role))return res.status(403).end();const db=load(),s=scope(req);const x={id:id(),...s,day:req.body.day,period:req.body.period,subject:req.body.subject,room:req.body.room||'',note:req.body.note||''};db.schedules.push(x);save(db);res.json(x)});
+app.get('/api/elections',auth,(req,res)=>{const db=load(),s=scope(req); const out=db.elections.filter(e=>e.schoolId===s.schoolId&&(e.grade==null||e.grade===s.grade)&&(e.className==null||e.className===s.className)).map(e=>({...e,candidates:e.candidates.map(c=>({id:c.id,name:(db.users.find(u=>u.id===c.userId)?.displayName)||'不明',votes:c.votes||0}))})); res.json(out);});
+app.post('/api/elections',auth,(req,res)=>{const type=req.body.type;const ok=(type==='CLASS_ADMIN'&&['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(req.user.role))||(type==='GRADE_ADMIN'&&['GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(req.user.role))||(type==='SCHOOL_ADMIN'&&['GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(req.user.role));if(!ok)return res.status(403).json({error:'選挙を開始できません'});const db=load(),s=scope(req);const ids=(req.body.candidateIds||[]).filter(x=>db.users.some(u=>u.id===x));const e={id:id(),type,...s,grade:type==='CLASS_ADMIN'?s.grade:s.grade,className:type==='CLASS_ADMIN'?s.className:null,candidates:ids.map(userId=>({id:id(),userId,votes:0})),voted:[],createdAt:Date.now(),endsAt:Date.now()+86400000,status:'OPEN'};db.elections.push(e);save(db);res.json(e)});
+app.post('/api/elections/:id/vote',auth,(req,res)=>{const db=load(),e=db.elections.find(x=>x.id===req.params.id);if(!e||e.status!=='OPEN'||e.voted.includes(req.user.id)||e.endsAt<Date.now())return res.status(400).json({error:'投票できません'});const c=e.candidates.find(c=>c.id===req.body.candidateId);if(!c)return res.status(400).end();c.votes++;e.voted.push(req.user.id);save(db);res.json({ok:true})});
+app.get('/api/study/books',auth,(req,res)=>res.json([{id:'target1200',name:'ターゲット1200',path:'/data/target1200.txt'},{id:'target1900',name:'ターゲット1900',path:'/data/target1900.txt'},{id:'tekkyoku',name:'鉄壁',path:'/data/鉄壁.txt'},{id:'irohani',name:'いろはにほへと古文単語',path:'/data/irohani.txt'}]));
+app.get('/data/:file', (req,res)=>{const p=path.join(__dirname,'data',req.params.file); if(!p.startsWith(path.join(__dirname,'data')))return res.status(403).end();res.sendFile(p)});
+app.get('/api/admins',auth,(req,res)=>{const db=load();res.json(db.users.filter(u=>u.schoolId===req.user.schoolId&&u.role!=='STUDENT').map(pub))});
+app.get('/api/debug/state',auth,(req,res)=>{if(req.user.role!=='SUPER_ADMIN')return res.status(403).end();const db=load();res.json({...db,users:db.users.map(pub)});});
+
+wss.on('connection',ws=>{ws.on('message',()=>{});});
+app.use((req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
+server.listen(process.env.PORT||3000,()=>console.log('Nova running on http://localhost:'+(process.env.PORT||3000)));
