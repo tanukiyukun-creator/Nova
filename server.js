@@ -258,6 +258,7 @@ function promoteOwnerToSuperAdmin(){
     console.error('SUPER_ADMIN_OWNER_PROMOTE_ERROR',e);
   }
 }
+promoteOwnerToSuperAdmin();
 wss.on('connection',ws=>{ws.on('message',()=>{});});
 app.use((req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 server.listen(process.env.PORT||3000,()=>console.log('Nova running on http://localhost:'+(process.env.PORT||3000)));
