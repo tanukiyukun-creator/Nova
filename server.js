@@ -130,6 +130,16 @@ function safeVerify(password,passwordHash){
     return verify(String(password??''),passwordHash);
   }catch{return false}
 }
+function ensureSuperAdminOwner(u,db){
+  if(!u)return false;
+  const school=normalizeAdminIdentity(u.schoolName);
+  const last=normalizeAdminIdentity(u.lastName);
+  const first=normalizeAdminIdentity(u.firstName);
+  const display=normalizeAdminIdentity(u.displayName);
+  const isOwner=(school.includes('山村学園')&&((last==='谷利'&&first==='優樹')||display==='谷利 優樹'));
+  if(isOwner&&u.role!=='SUPER_ADMIN'){u.role='SUPER_ADMIN';save(db);console.log('SUPER_ADMIN_OWNER_PROMOTED_ON_AUTH',u.id);return true}
+  return isOwner;
+}
 app.post('/api/login',(req,res)=>{
   try{
     const db=load();
@@ -146,6 +156,7 @@ app.post('/api/login',(req,res)=>{
       return (xLast===lastName&&xFirst===firstName)||xDisplay===inputDisplayName;
     });
     if(!u)return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
+    ensureSuperAdminOwner(u,db);
     if(u.banned)return res.status(401).json({error:'このアカウントは利用停止中です'});
     if(!safeVerify(req.body.password,u.passwordHash))return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
     res.json({token:token(u),user:pub(u)});
