@@ -36,6 +36,16 @@ async function renderSuperAdmin(){
   window.NOVA_SUPER_STATE=state;
   superSection('overview');
 }
+async function superBan(id){
+  const reason=prompt('BAN理由を入力してください（任意）','Novaの利用規約違反');
+  if(reason===null)return;
+  if(!confirm('このアカウントを利用停止にしますか？'))return;
+  try{await api('/api/super/users/'+id+'/ban',{method:'POST',body:JSON.stringify({reason})});toast('アカウントをBANしました');return renderSuperAdmin()}catch(x){toast(x.message)}
+}
+async function superUnban(id){
+  if(!confirm('このアカウントのBANを解除しますか？'))return;
+  try{await api('/api/super/users/'+id+'/unban',{method:'POST'});toast('BANを解除しました');return renderSuperAdmin()}catch(x){toast(x.message)}
+}
 function superSection(section,btn){
   document.querySelectorAll('.super-nav').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
@@ -75,7 +85,7 @@ function superSection(section,btn){
         </section>
       </div>`;
   }else if(section==='users'){
-    c.innerHTML=`<section class="glass super-card"><div class="super-card-head"><div><small>USER DIRECTORY</small><h3>全ユーザー</h3></div><span class="super-count">${users.length} USERS</span></div><div class="super-table-wrap"><table class="super-table"><thead><tr><th>ユーザー</th><th>学校</th><th>所属</th><th>権限</th></tr></thead><tbody>${users.map(u=>`<tr><td><div class="table-user"><div class="super-mini-avatar">${u.icon?'<img src="'+esc(u.icon)+'">':'N'}</div><b>${esc(u.displayName)}</b></div></td><td>${esc(u.schoolName)}</td><td>${esc(u.grade)}年 ${esc(u.className)}組 / ${esc(u.attendanceNo)}</td><td><span class="role-pill ${esc(String(u.role||'STUDENT').toLowerCase())}">${esc(u.role||'STUDENT')}</span></td></tr>`).join('')}</tbody></table></div></section>`;
+    c.innerHTML=`<section class="glass super-card"><div class="super-card-head"><div><small>USER DIRECTORY</small><h3>全ユーザー</h3></div><span class="super-count">${users.length} USERS</span></div><div class="super-table-wrap"><table class="super-table"><thead><tr><th>ユーザー</th><th>学校</th><th>所属</th><th>権限</th><th>状態</th><th>操作</th></tr></thead><tbody>${users.map(u=>`<tr><td><div class="table-user"><div class="super-mini-avatar">${u.icon?'<img src="'+esc(u.icon)+'">':'N'}</div><b>${esc(u.displayName)}</b></div></td><td>${esc(u.schoolName)}</td><td>${esc(u.grade)}年 ${esc(u.className)}組 / ${esc(u.attendanceNo)}</td><td><span class="role-pill ${esc(String(u.role||'STUDENT').toLowerCase())}">${esc(u.role||'STUDENT')}</span></td><td><span class="status-pill ${u.banned?'banned':'active'}">${u.banned?'BAN':'ACTIVE'}</span></td><td>${u.role==='SUPER_ADMIN'?'<span class="protected-label">保護</span>':u.banned?'<button class="ban-btn unban" onclick="superUnban(\\''+u.id+'\\'')">BAN解除</button>':'<button class="ban-btn" onclick="superBan(\\''+u.id+'\\'')">アカウントBAN</button>'}</td></tr>`).join('')}</tbody></table></div></section>`;
   }else if(section==='schools'){
     c.innerHTML=`<section class="glass super-card"><div class="super-card-head"><div><small>SCHOOL DIRECTORY</small><h3>登録学校</h3></div><span class="super-count">${schools.length} SCHOOLS</span></div><div class="school-admin-grid">${schools.map(s=>{const n=users.filter(u=>u.schoolId===s.id).length;return `<div class="school-admin-card"><div class="school-mark">N</div><div><b>${esc(s.name)}</b><span>${n} users</span></div><i>›</i></div>`}).join('')||'<div class="super-empty">登録学校はありません</div>'}</div></section>`;
   }else if(section==='admins'){
