@@ -10,7 +10,7 @@ const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const app=express(); const server=createServer(app); const wss=new WebSocketServer({server,path:'/ws'});
 app.use(express.json({limit:'8mb'})); app.use(express.static(path.join(__dirname,'public')));
 const DB=path.join(__dirname,'db.json');
-const empty={users:[],schools:[],messages:[],classTalks:[],friends:[],posts:[],events:[],tasks:[],taskCompletions:[],schedules:[],elections:[],notifications:[],calls:[]};
+const empty={users:[],schools:[],messages:[],classTalks:[],talks:[],friends:[],posts:[],events:[],tasks:[],taskCompletions:[],schedules:[],elections:[],notifications:[],calls:[]};
 const SCHOOL_STARTER=['早稲田大学高等学院','早稲田実業学校高等部','慶應義塾高等学校','開成高等学校','筑波大学附属高等学校','東京学芸大学附属高等学校','日比谷高等学校','浦和高等学校','浦和第一女子高等学校','川越高等学校','川越女子高等学校','川越東高等学校','熊谷高等学校','山村学園高等学校','山村国際高等学校','大宮高等学校','所沢高等学校','春日部高等学校','越谷北高等学校','栄東高等学校','淑徳与野高等学校','明治大学付属明治高等学校','青山学院高等部','中央大学附属高等学校','立教新座高等学校'];
 function load(){if(!fs.existsSync(DB)) fs.writeFileSync(DB,JSON.stringify(empty,null,2)); return JSON.parse(fs.readFileSync(DB,'utf8'));}
 function save(db){fs.writeFileSync(DB,JSON.stringify(db,null,2));}
@@ -155,7 +155,28 @@ app.post('/api/login',(req,res)=>{
   }
 });
 app.get('/api/me',auth,(req,res)=>res.json(pub(req.user)));
-app.patch('/api/me',auth,(req,res)=>{const db=load();const u=db.users.find(x=>x.id===req.user.id);Object.assign(u,{displayName:req.body.displayName??u.displayName,lastName:req.body.lastName??u.lastName,firstName:req.body.firstName??u.firstName,icon:req.body.icon??u.icon,settings:{...u.settings,...(req.body.settings||{})}});save(db);res.json(pub(u))});
+app.patch('/api/me',auth,(req,res)=>{
+  try{
+    const db=load(),u=db.users.find(x=>x.id===req.user.id);
+    const nextSchool=String(req.body.schoolName??u.schoolName).trim();
+    const nextGrade=String(req.body.grade??u.grade);
+    const nextClass=String(req.body.className??u.className).trim();
+    const nextLast=String(req.body.lastName??u.lastName).trim();
+    const nextFirst=String(req.body.firstName??u.firstName).trim();
+    if(!nextSchool||!['1','2','3'].includes(nextGrade)||!nextClass||!nextLast||!nextFirst)return res.status(400).json({error:'学校・学年・クラス・氏名を正しく入力してください'});
+    if(req.body.newPassword){
+      if(!req.body.currentPassword||!safeVerify(req.body.currentPassword,u.passwordHash))return res.status(401).json({error:'現在のパスワードが正しくありません'});
+      if(String(req.body.newPassword).length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});
+      u.passwordHash=hash(String(req.body.newPassword));
+    }
+    Object.assign(u,{schoolName:nextSchool,grade:nextGrade,className:nextClass,lastName:nextLast,firstName:nextFirst,displayName:`${nextLast} ${nextFirst}`,icon:req.body.icon??u.icon,settings:{...u.settings,...(req.body.settings||{})}});
+    const school=db.schools.find(x=>x.id===u.schoolId||x.name===nextSchool);
+    if(school)u.schoolId=school.id;
+    else{const ns={id:id(),masterId:null,name:nextSchool,grades:[]};db.schools.push(ns);u.schoolId=ns.id;}
+    save(db);res.json(pub(u));
+  }catch(e){console.error('ME_UPDATE_ERROR',e);res.status(500).json({error:'設定の保存に失敗しました'})}
+});
+
 app.get('/api/users/search',auth,(req,res)=>{const db=load(),q=(req.query.q||'').toLowerCase();res.json(db.users.filter(u=>u.id!==req.user.id&&(!q||u.displayName.toLowerCase().includes(q))).slice(0,30).map(pub))});
 app.post('/api/friends/:id',auth,(req,res)=>{const db=load(); if(!db.users.some(u=>u.id===req.params.id))return res.status(404).end(); if(!db.friends.some(f=>f.a===req.user.id&&f.b===req.params.id)){db.friends.push({a:req.user.id,b:req.params.id,createdAt:Date.now()});save(db)} res.json({ok:true})});
 app.get('/api/friends',auth,(req,res)=>{const db=load();const ids=db.friends.filter(f=>f.a===req.user.id||f.b===req.user.id).map(f=>f.a===req.user.id?f.b:f.a);res.json(db.users.filter(u=>ids.includes(u.id)).map(pub))});
@@ -163,6 +184,35 @@ app.get('/api/chats/:otherId',auth,(req,res)=>{const db=load();res.json(db.messa
 app.post('/api/chats/:otherId',auth,(req,res)=>{const db=load();const m={id:id(),from:req.user.id,to:req.params.otherId,text:String(req.body.text||''),replyTo:req.body.replyTo||null,createdAt:Date.now()};if(!m.text.trim())return res.status(400).end();db.messages.push(m);notify(db,m.to,'message','新しいメッセージ',`${req.user.displayName}からメッセージが届きました`);save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message',message:m}))});res.json(m)});
 app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifications.filter(n=>n.userId===req.user.id).slice(0,100))});
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
+12305
+function ensureTalk(db,user,room){
+  if(!Array.isArray(db.talks))db.talks=[];
+  let talk=db.talks.find(x=>x.room===room&&x.schoolId===user.schoolId&&(room==='gradeadmin'?x.grade===user.grade:true));
+  if(!talk){
+    talk={id:id(),room,schoolId:user.schoolId,grade:room==='gradeadmin'?user.grade:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?`${user.grade}年${user.className}組 クラストーク`:room==='classadmin'?'CLASS ADMIN トーク':`${user.grade}年 GRADE ADMIN トーク`,memberIds:[],createdAt:Date.now()};
+    db.talks.push(talk);
+  }
+  if(room==='class')db.users.filter(x=>sameGroup(x,user)).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
+  if(room==='classadmin')db.users.filter(x=>sameGroup(x,user)&&['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(x.role)).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
+  if(room==='gradeadmin')db.users.filter(x=>x.schoolId===user.schoolId&&x.grade===user.grade&&['GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(x.role)).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
+  return talk;
+}
+app.get('/api/talks/:room',auth,(req,res)=>{
+  const room=String(req.params.room);
+  if(!['class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
+  const db=load(),talk=ensureTalk(db,req.user,room);
+  const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>({...m,fromName:db.users.find(u=>u.id===m.from)?.displayName||'メンバー'}));
+  save(db);res.json({talk,messages});
+});
+app.post('/api/talks/:room/messages',auth,(req,res)=>{
+  const room=String(req.params.room);if(!['class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
+  const db=load(),talk=ensureTalk(db,req.user,room);
+  if(!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このトークのメンバーではありません'});
+  const text=String(req.body.text||'').trim();if(!text)return res.status(400).json({error:'メッセージを入力してください'});
+  const m={id:id(),type:'group',talkId:talk.id,from:req.user.id,text,createdAt:Date.now()};
+  db.messages.push(m);talk.memberIds.filter(x=>x!==req.user.id).forEach(uid=>notify(db,uid,'group_message',talk.name,`${req.user.displayName}からメッセージが届きました`));
+  save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:m,talkId:talk.id}))});res.json(m);
+});
 function scope(req){return {schoolId:req.user.schoolId,grade:req.user.grade,className:req.user.className}}
 app.get('/api/class',auth,(req,res)=>{
   const db=load();
