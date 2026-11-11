@@ -268,3 +268,9 @@ button:active,.btn:active{transform:scale(.98)}
 .app-shell.role-school_admin .sidebar,
 .app-shell.role-super_admin .sidebar{box-shadow:inset -1px 0 0 var(--role-line),0 18px 60px rgba(0,0,0,.18)}
 .app-shell.role-super_admin{background:radial-gradient(circle at 85% 8%,rgba(229,199,111,.055),transparent 28%),var(--bg)}
+
+
+/* Permission level badge */
+.role-badge{margin:8px 12px 14px;padding:10px 12px;border:1px solid var(--role-line);border-radius:12px;background:var(--role-accent-soft);display:flex;flex-direction:column;gap:3px}
+.role-badge span{font-size:10px;color:var(--muted);letter-spacing:.08em}
+.role-badge strong{font-size:13px;color:var(--role-accent);font-weight:800}
