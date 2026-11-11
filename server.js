@@ -184,7 +184,6 @@ app.get('/api/chats/:otherId',auth,(req,res)=>{const db=load();res.json(db.messa
 app.post('/api/chats/:otherId',auth,(req,res)=>{const db=load();const m={id:id(),from:req.user.id,to:req.params.otherId,text:String(req.body.text||''),replyTo:req.body.replyTo||null,createdAt:Date.now()};if(!m.text.trim())return res.status(400).end();db.messages.push(m);notify(db,m.to,'message','新しいメッセージ',`${req.user.displayName}からメッセージが届きました`);save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message',message:m}))});res.json(m)});
 app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifications.filter(n=>n.userId===req.user.id).slice(0,100))});
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
-12305
 function ensureTalk(db,user,room){
   if(!Array.isArray(db.talks))db.talks=[];
   let talk=db.talks.find(x=>x.room===room&&x.schoolId===user.schoolId&&(room==='gradeadmin'?x.grade===user.grade:true));
