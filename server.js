@@ -18,7 +18,21 @@ function id(){return crypto.randomBytes(12).toString('hex')}
 function hash(p,s=crypto.randomBytes(16).toString('hex')){return `${s}:${crypto.scryptSync(p,s,64).toString('hex')}`}
 function verify(p,h){const [s,x]=h.split(':'); return crypto.timingSafeEqual(Buffer.from(x,'hex'),crypto.scryptSync(p,s,64))}
 function token(u){const raw=JSON.stringify({id:u.id,exp:Date.now()+1000*60*60*24*30}); const b=Buffer.from(raw).toString('base64url'); const sig=crypto.createHmac('sha256',process.env.NOVA_SECRET||'nova-dev-secret-change-me').update(b).digest('base64url'); return b+'.'+sig}
-function auth(req,res,next){const t=(req.headers.authorization||'').replace('Bearer ',''); try{const [b,s]=t.split('.'); const ok=crypto.timingSafeEqual(Buffer.from(s||''),Buffer.from(crypto.createHmac('sha256',process.env.NOVA_SECRET||'nova-dev-secret-change-me').update(b||'').digest('base64url'))); const p=JSON.parse(Buffer.from(b,'base64url')); if(!ok||p.exp<Date.now()) throw 0; const db=load(); req.user=db.users.find(x=>x.id===p.id); if(!req.user||req.user.banned)throw 0; next()}catch{res.status(401).json({error:'認証が必要です'})}}
+function auth(req,res,next){
+  const t=String(req.headers.authorization||'').replace(/^Bearer\\s+/i,'').trim();
+  try{
+    const [b,s]=t.split('.');
+    if(!b||!s)throw 0;
+    const expected=crypto.createHmac('sha256',process.env.NOVA_SECRET||'nova-dev-secret-change-me').update(b).digest('base64url');
+    if(s.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(s),Buffer.from(expected)))throw 0;
+    const p=JSON.parse(Buffer.from(b,'base64url').toString('utf8'));
+    if(!p.id||!p.exp||p.exp<Date.now())throw 0;
+    const db=load();
+    req.user=db.users.find(x=>x.id===p.id);
+    if(!req.user||req.user.banned)throw 0;
+    next();
+  }catch{res.status(401).json({error:'認証が必要です'})}
+}
 function pub(u){const {passwordHash,...x}=u;return x}
 function notify(db,userId,type,title,body){db.notifications.unshift({id:id(),userId,type,title,body,read:false,createdAt:Date.now()});}
 function sameGroup(a,b){return a.schoolId===b.schoolId&&a.grade===b.grade&&a.className===b.className}
@@ -76,15 +90,16 @@ app.post('/api/register',(req,res)=>{
     const db=load();
     const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon}=req.body;
     const displayName=[lastName,firstName].filter(Boolean).join(' ').trim();
-    if(!schoolName||!schoolId||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});
+    if(!schoolName||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});
     if(!['1','2','3'].includes(String(grade)))return res.status(400).json({error:'学年は1〜3から選択してください'});
     if(!/^\d+$/.test(String(attendanceNo))||Number(attendanceNo)<1)return res.status(400).json({error:'出席番号は1以上の数字で入力してください'});
     if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});
     if(!/^[^<>]{1,40}$/.test(lastName)||!/^[^<>]{1,40}$/.test(firstName))return res.status(400).json({error:'氏名を正しく入力してください'});
     if(icon&&icon.length>6*1024*1024)return res.status(400).json({error:'写真のサイズが大きすぎます'});
-    let school=db.schools.find(x=>x.masterId===schoolId||x.id===schoolId||x.name===schoolName);
+    const requestedSchoolId=String(schoolId||'').trim();
+    let school=db.schools.find(x=>(requestedSchoolId&&(x.masterId===requestedSchoolId||x.id===requestedSchoolId))||x.name===schoolName);
     if(!school){
-      school={id:id(),masterId:String(schoolId),name:schoolName,grades:[]};
+      school={id:id(),masterId:requestedSchoolId||null,name:String(schoolName).trim(),grades:[]};
       db.schools.push(school);
     }
     const normalizedClass=String(className).trim();
@@ -102,6 +117,7 @@ app.post('/api/register',(req,res)=>{
     save(db);
     res.json({token:token(u),user:pub(u)});
   }catch(e){
+    console.error('REGISTER_ERROR',e);
     res.status(500).json({error:'登録処理に失敗しました'});
   }
 });
@@ -134,6 +150,7 @@ app.post('/api/login',(req,res)=>{
     if(!safeVerify(req.body.password,u.passwordHash))return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
     res.json({token:token(u),user:pub(u)});
   }catch(e){
+    console.error('LOGIN_ERROR',e);
     res.status(500).json({error:'ログイン処理に失敗しました'});
   }
 });
