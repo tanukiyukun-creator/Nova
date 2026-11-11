@@ -198,7 +198,7 @@ async function login(e){
     toast('ログインしました');
   }catch(x){toast(x.message)}
 }
-async function go(v){view=v;await render()}
+async function go(v){view=v;await render(true)}
 async function route(){const m=$('#main');if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='school')return school(m);if(view==='study')return study(m);if(view==='people')return people(m);return settings(m)}
 async function home(m){
   const [events,tasks,notes]=await Promise.all([api('/api/events'),api('/api/tasks'),api('/api/notifications')]);
