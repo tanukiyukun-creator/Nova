@@ -104,7 +104,7 @@ app.get('/api/class',auth,(req,res)=>{
     db.classTalks.push(talk);
   }
   if(!talk.memberIds.includes(req.user.id)){talk.memberIds.push(req.user.id);save(db);}
-  const messages=(db.messages||[]).filter(m=>m.type==='class'&&m.talkId===talk.id).slice(-200);
+  const messages=(db.messages||[]).filter(m=>m.type==='class'&&m.talkId===talk.id).slice(-200).map(m=>({...m,fromName:db.users.find(u=>u.id===m.from)?.displayName||'クラスメンバー'}));
   const members=db.users.filter(u=>talk.memberIds.includes(u.id)).map(pub);
   res.json({talk,messages,members});
 });
