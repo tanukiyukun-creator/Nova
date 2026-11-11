@@ -4,7 +4,7 @@ const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function toast(x){const d=document.createElement('div');d.className='toast';d.textContent=x;document.body.append(d);setTimeout(()=>d.remove(),2600)}
 function setSession(x){me=x.user;localStorage.novaUser=JSON.stringify(me);localStorage.novaToken=x.token}
 function logout(){localStorage.removeItem('novaUser');localStorage.removeItem('novaToken');me=null;render()}
-async function render(skipAuthRefresh=false){if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');localStorage.novaUser=JSON.stringify(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(me.role==='SUPER_ADMIN')return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell"><aside class="sidebar glass"><div class="logo"><span>N</span><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><nav>${[['home','⌂','ホーム'],['chat','◌','チャット'],['school','▦','学校'],['study','◇','学習'],['people','♧','友達'],['settings','⚙','設定']].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button onclick="go('settings')">⚙　設定</button><button onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'チャット',school:'学校',study:'学習',people:'友達',settings:'設定'})[view]}</h1></div><div class="top-actions"><button class="icon-btn" onclick="go('people')">⌕</button><button class="icon-btn">♧</button><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':'N'}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','チャット'],['study','◇','学習'],['school','▦','学校'],['people','♧','友達']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
+async function render(skipAuthRefresh=false){if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');localStorage.novaUser=JSON.stringify(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(me.role==='SUPER_ADMIN')return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell"><aside class="sidebar glass"><div class="logo"><span>N</span><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><nav>${[['home','⌂','ホーム'],['chat','◌','チャット'],['school','▦','学校'],['study','◇','学習'],['people','♧','友達'],['settings','⚙','設定']].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'チャット',school:'学校',study:'学習',people:'友達',settings:'設定'})[view]}</h1></div><div class="top-actions"><button class="icon-btn" onclick="go('people')">⌕</button><button class="icon-btn">♧</button><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':'N'}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','チャット'],['study','◇','学習'],['school','▦','学校'],['people','♧','友達']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
 async function renderSuperAdmin(){
   let state={users:[],schools:[],messages:[],friends:[],posts:[],events:[],tasks:[],schedules:[],elections:[],notifications:[],calls:[]};
   try{state=await api('/api/debug/state')}catch(x){document.body.innerHTML=`<div class="auth premium-auth"><div class="authbox glass"><div class="auth-logo"><span>N</span><div>NOVA<small>SYSTEM ADMIN</small></div></div><div class="auth-hero"><small>SUPER ADMIN</small><h1>管理画面を開けませんでした</h1><p>${esc(x.message||'認証セッションを確認してください')}</p><button class="btn alt" onclick="logout()">通常ログインへ</button></div></div></div>`;return}
@@ -176,10 +176,9 @@ async function register(e){
   };
   try{
     setSession(await api('/api/register',{method:'POST',body:JSON.stringify(body)}));
-    view='chat';
-    chatRoom='class';
+    view='home';
     await render(true);
-    toast('登録が完了しました。ホーム画面へ移動しました');
+    toast('登録が完了しました。所属クラスに参加しました');
   }catch(x){toast(x.message)}
 }
 async function login(e){
@@ -194,8 +193,7 @@ async function login(e){
   if(!body.schoolName||!body.lastName||!body.firstName||!body.password)return toast('学校名・姓・名・パスワードを入力してください');
   try{
     setSession(await api('/api/login',{method:'POST',body:JSON.stringify(body)}));
-    view='chat';
-    chatRoom='class';
+    view='home';
     await render(true);
     toast('ログインしました');
   }catch(x){toast(x.message)}
@@ -239,8 +237,8 @@ async function home(m){
   const dateText=selected.toLocaleDateString('ja-JP',{month:'long',day:'numeric'});
   const weekday=selected.toLocaleDateString('ja-JP',{weekday:'long'});
   const unfinished=tasks.filter(t=>!t.completed).slice(0,4);
-  const unreadChats=homeNotificationItems(notes).filter(n=>['message','class_message','reply'].includes(n.type)).slice(0,4);
-  const notices=homeNotificationItems(notes).filter(n=>!['message','class_message','reply'].includes(n.type)).slice(0,4);
+  const unreadChats=homeNotificationItems(notes).filter(n=>['message','class_message','group_message','reply'].includes(n.type)).slice(0,4);
+  const notices=homeNotificationItems(notes).filter(n=>!['message','class_message','group_message','reply'].includes(n.type)).slice(0,4);
   const daySchedule=schedule.filter(x=>scheduleMatchesDay(x,selected)).sort((a,b)=>Number(a.period||0)-Number(b.period||0));
   const scheduleHtml=daySchedule.map(x=>`<div class="home-schedule-row"><span class="period">${esc(x.period)}限</span><div><b>${esc(x.subject||'授業')}</b><small>${esc(x.room||'')}</small></div></div>`).join('')||'<div class="home-empty">この日の時間割は未登録です</div>';
   const taskHtml=unfinished.map(t=>`<button class="home-task-row" onclick="go('school')"><span class="task-dot"></span><div><b>${esc(t.title||'課題')}</b><small>${esc(t.subject||'課題')} · ${homeFormatTaskDate(t)}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未完了の課題はありません</div>';
@@ -304,8 +302,8 @@ async function chat(m){
 }
 async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
 async function groupChatHtml(room){
-  const data=await api('/api/talks/'+room);
-  return (data.messages||[]).map(x=>`<div class="bubble ${x.from===me.id?'mine':''}"><div class="sub">${x.from===me.id?'あなた':esc(x.fromName||'メンバー')}</div>${esc(x.text)}<div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<p class="sub">まだメッセージはありません。</p>';
+  const data=room==='class'?await api('/api/class'):await api('/api/talks/'+encodeURIComponent(room));
+  return (data.messages||[]).map(x=>`<div class="bubble ${x.from===me.id?'mine':''}"><div class="sub">${x.from===me.id?'あなた':esc(x.fromName||'メンバー')}</div><div class="bubble-text">${esc(x.text)}</div><div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
 }
 async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
 async function sendCurrentChat(e){
@@ -313,9 +311,10 @@ async function sendCurrentChat(e){
   const f=new FormData(e.target),text=String(f.get('text')||'').trim();
   if(!text)return;
   try{
-    if(chatRoom==='friend')await api('/api/chats/'+chatTarget,{method:'POST',body:JSON.stringify({text})});
-    else await api('/api/talks/'+chatRoom+'/messages',{method:'POST',body:JSON.stringify({text})});
-    e.target.reset();chat($('#main'));
+    if(chatRoom==='friend')await api('/api/chats/'+encodeURIComponent(chatTarget),{method:'POST',body:JSON.stringify({text})});
+    else if(chatRoom==='class')await api('/api/class/messages',{method:'POST',body:JSON.stringify({text})});
+    else await api('/api/talks/'+encodeURIComponent(chatRoom)+'/messages',{method:'POST',body:JSON.stringify({text})});
+    e.target.reset();await chat($('#main'));
   }catch(x){toast(x.message)}
 }
 async function chatHtml(id2){const ms=await api('/api/chats/'+id2);return ms.map(x=>`<div class="bubble ${x.from===me.id?'mine':''}">${esc(x.text)}<div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<p class="sub">まだメッセージはありません。</p>'}
