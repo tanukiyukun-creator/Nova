@@ -19,7 +19,7 @@ function hash(p,s=crypto.randomBytes(16).toString('hex')){return `${s}:${crypto.
 function verify(p,h){const [s,x]=h.split(':'); return crypto.timingSafeEqual(Buffer.from(x,'hex'),crypto.scryptSync(p,s,64))}
 function token(u){const raw=JSON.stringify({id:u.id,exp:Date.now()+1000*60*60*24*30}); const b=Buffer.from(raw).toString('base64url'); const sig=crypto.createHmac('sha256',process.env.NOVA_SECRET||'nova-dev-secret-change-me').update(b).digest('base64url'); return b+'.'+sig}
 function auth(req,res,next){
-  const t=String(req.headers.authorization||'').replace(/^Bearer\\s+/i,'').trim();
+  const t=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'').trim();
   try{
     const [b,s]=t.split('.');
     if(!b||!s)throw 0;
