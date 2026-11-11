@@ -200,36 +200,81 @@ async function login(e){
 }
 async function go(v){view=v;await render(true)}
 async function route(){const m=$('#main');if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='school')return school(m);if(view==='study')return study(m);if(view==='people')return people(m);return settings(m)}
+let homeSelectedDate=new Date();
+let homeClockTimer=null;
+function homeDay(delta){
+  homeSelectedDate=new Date(homeSelectedDate.getFullYear(),homeSelectedDate.getMonth(),homeSelectedDate.getDate()+delta);
+  home($('#main'));
+}
+function homeResetDay(){
+  homeSelectedDate=new Date();
+  home($('#main'));
+}
+function homeDayKey(d){
+  return ['日','月','火','水','木','金','土'][d.getDay()];
+}
+function scheduleMatchesDay(item,d){
+  const raw=String(item.day??'').trim();
+  const key=homeDayKey(d);
+  if(!raw)return false;
+  if(raw===key||raw===key+'曜'||raw===key+'曜日')return true;
+  if(/^\\d$/.test(raw)&&Number(raw)===d.getDay())return true;
+  const map={'0':'日','1':'月','2':'火','3':'水','4':'木','5':'金','6':'土'};
+  return map[raw]===key;
+}
+function homeFormatTaskDate(t){
+  if(!t.dueAt)return '期限未設定';
+  return new Date(t.dueAt).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'});
+}
+function homeNotificationItems(notes){
+  return notes.filter(n=>!n.read);
+}
 async function home(m){
-  const [events,tasks,notes]=await Promise.all([api('/api/events'),api('/api/tasks'),api('/api/notifications')]);
-  const now=new Date(), date=now.toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'long'});
-  const unread=notes.filter(x=>!x.read).length;
-  const avatar=me.icon?'<img class="hero-avatar" src="'+esc(me.icon)+'">':'<div class="hero-avatar fallback">N</div>';
-  m.innerHTML='<div class="nova-home">'+
-    '<section class="home-hero glass">'+
-      '<div class="hero-backdrop"></div><div class="hero-content">'+
-        '<div class="hero-top"><div><div class="eyebrow">NOVA · SCHOOL LIFE</div><div class="hero-date">'+date+'</div></div><div class="hero-profile">'+avatar+'<div><b>'+esc(me.lastName||'')+' '+esc(me.firstName||'')+'</b><span>'+esc(me.grade)+'年 · '+esc(me.className)+'組</span></div></div></div>'+
-        '<div class="hero-main"><div><p class="hero-kicker">GOOD EVENING</p><h2>'+esc(me.firstName||me.displayName)+'<span> さん</span></h2><p>'+esc(me.schoolName)+'</p></div><div class="hero-actions"><button class="hero-action" onclick="go(\'chat\')"><span>チャット</span><b>→</b></button><button class="hero-action" onclick="go(\'study\')"><span>学習を始める</span><b>→</b></button></div></div>'+
-      '</div></section>'+
-    '<div class="home-grid">'+
-      '<section class="glass home-card schedule-main"><div class="card-head"><div><span class="card-icon">◷</span><div><b>今日の予定</b><small>MY SCHEDULE</small></div></div><button class="text-link" onclick="go(\'school\')">すべて見る　›</button></div>'+
-        '<div class="schedule-feature"><div class="period-badge">03<span>限目</span></div><div class="schedule-subject"><b>数学</b><span>通常授業</span></div><div class="schedule-time">09:50<br><small>教室</small></div></div>'+
-        '<div class="schedule-list"><div><span>04</span><b>英語</b><small>4限目</small></div><div><span>放課後</span><b>自由時間</b><small>16:10〜</small></div></div>'+
-      '</section>'+
-      '<section class="glass home-card task-card"><div class="card-head"><div><span class="card-icon">□</span><div><b>課題</b><small>ASSIGNMENTS</small></div></div><button class="text-link" onclick="go(\'school\')">すべて見る　›</button></div>'+
-        (tasks.slice(0,3).map(t=>'<div class="task-item"><div class="task-subject">'+esc(t.subject||'課題')+'</div><div class="task-info"><b>'+esc(t.title)+'</b><span>'+(t.dueAt?new Date(t.dueAt).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'}):'期限未設定')+'</span></div><i>›</i></div>').join('')||'<div class="empty-state">現在の課題はありません</div>')+
-      '</section>'+
-      '<section class="glass home-card chat-card"><div class="card-head"><div><span class="card-icon">◌</span><div><b>最近のチャット</b><small>RECENT TALKS</small></div></div><button class="text-link" onclick="go(\'chat\')">すべて見る　›</button></div>'+
-        '<div class="recent-chat"><div class="mini-avatar">N</div><div><b>クラス全体</b><span>明日の持ち物を確認して...</span></div><small>12分前</small></div>'+
-        '<div class="recent-chat"><div class="mini-avatar tone">1</div><div><b>'+esc(me.grade)+'年'+esc(me.className)+'組</b><span>了解です！</span></div><small>38分前</small></div>'+
-        '<div class="recent-chat"><div class="mini-avatar">◎</div><div><b>学校からのお知らせ</b><span>今週の予定について</span></div><small>1時間前</small></div>'+
-      '</section>'+
-      '<section class="glass home-card study-card"><div class="card-head"><div><span class="card-icon">◇</span><div><b>学習をはじめる</b><small>STUDY</small></div></div><button class="gold-link" onclick="go(\'study\')">学習を始める　→</button></div>'+
-        '<p class="study-copy">今日も少しずつ。あなたのペースで学ぶ。</p><div class="study-modes"><button onclick="go(\'study\')"><span>▤</span><b>単語帳</b><small>4 BOOKS</small></button><button onclick="go(\'study\')"><span>☑</span><b>4択問題</b><small>QUIZ</small></button><button onclick="go(\'study\')"><span>◉</span><b>リスニング</b><small>LISTENING</small></button><button onclick="go(\'study\')"><span>▱</span><b>フラッシュ</b><small>FLASHCARD</small></button><button onclick="go(\'study\')"><span>／</span><b>ライティング</b><small>WRITING</small></button></div>'+
-      '</section>'+
-      '<section class="glass home-card event-card"><div class="card-head"><div><span class="card-icon">▣</span><div><b>行事カレンダー</b><small>EVENTS</small></div></div><button class="text-link">すべて見る　›</button></div><div class="calendar-date"><strong>'+now.getDate()+'</strong><div><b>'+now.toLocaleDateString('ja-JP',{month:'long'})+'</b><span>'+now.toLocaleDateString('ja-JP',{weekday:'long'})+'</span></div></div><div class="event-list">'+(events.slice(0,3).map(e=>'<div><span>'+esc(e.date||'予定')+'</span><b>'+esc(e.title)+'</b></div>').join('')||'<div class="empty-state">行事予定はありません</div>')+'</div></section>'+
-      '<section class="glass home-card notice-card"><div class="card-head"><div><span class="card-icon">♧</span><div><b>通知</b><small>NOTIFICATIONS</small></div></div></div><div class="notice-number">'+unread+'<span>未読のお知らせ</span></div><button class="notice-btn" onclick="api(\'/api/notifications/read\',{method:\'POST\'}).then(()=>render())">すべて既読にする</button></section>'+
-    '</div></div>';
+  const [tasks,notes,schedule]=await Promise.all([api('/api/tasks'),api('/api/notifications'),api('/api/schedule')]);
+  const now=new Date();
+  const selected=new Date(homeSelectedDate);
+  const isToday=selected.toDateString()===now.toDateString();
+  const dateText=selected.toLocaleDateString('ja-JP',{month:'long',day:'numeric'});
+  const weekday=selected.toLocaleDateString('ja-JP',{weekday:'long'});
+  const unfinished=tasks.filter(t=>!t.completed).slice(0,4);
+  const unreadChats=homeNotificationItems(notes).filter(n=>['message','class_message','reply'].includes(n.type)).slice(0,4);
+  const notices=homeNotificationItems(notes).filter(n=>!['message','class_message','reply'].includes(n.type)).slice(0,4);
+  const daySchedule=schedule.filter(x=>scheduleMatchesDay(x,selected)).sort((a,b)=>Number(a.period||0)-Number(b.period||0));
+  const scheduleHtml=daySchedule.map(x=>`<div class="home-schedule-row"><span class="period">${esc(x.period)}限</span><div><b>${esc(x.subject||'授業')}</b><small>${esc(x.room||'')}</small></div></div>`).join('')||'<div class="home-empty">この日の時間割は未登録です</div>';
+  const taskHtml=unfinished.map(t=>`<button class="home-task-row" onclick="go('school')"><span class="task-dot"></span><div><b>${esc(t.title||'課題')}</b><small>${esc(t.subject||'課題')} · ${homeFormatTaskDate(t)}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未完了の課題はありません</div>';
+  const chatHtml=unreadChats.map(n=>`<button class="home-unread-row" onclick="go('chat')"><span class="unread-dot"></span><div><b>${esc(n.title||'新しいメッセージ')}</b><small>${esc(n.body||'未読のメッセージがあります')}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未読のチャットはありません</div>';
+  const noticeHtml=notices.map(n=>`<div class="home-notice-row"><span class="notice-mark">•</span><div><b>${esc(n.title||'お知らせ')}</b><small>${esc(n.body||'')}</small></div></div>`).join('')||'<div class="home-empty">新しいお知らせはありません</div>';
+  m.innerHTML=`<div class="nova-home nova-home-compact">
+    <section class="home-head glass">
+      <div><div class="eyebrow">NOVA · SCHOOL LIFE</div><div class="home-date-line"><strong>${dateText}</strong><span>${weekday}</span></div><div id="homeClock" class="home-clock"></div></div>
+      <div class="home-head-profile"><div class="avatar">${me.icon?'<img src="'+esc(me.icon)+'">':'N'}</div><div><b>${esc(me.lastName||'')} ${esc(me.firstName||'')}</b><small>${esc(me.grade)}年 · ${esc(me.className)}組</small></div></div>
+    </section>
+    <section class="home-card glass home-schedule-card">
+      <div class="compact-card-head">
+        <div><span class="card-icon">◷</span><div><b>時間割</b><small>${isToday?'今日':'選択中の日付'} · ${weekday}</small></div></div>
+        <div class="day-controls"><button onclick="homeDay(-1)" aria-label="前の日">‹</button><button class="today-btn" onclick="homeResetDay()">今日</button><button onclick="homeDay(1)" aria-label="次の日">›</button></div>
+      </div>
+      <div class="home-schedule-list">${scheduleHtml}</div>
+    </section>
+    <div class="home-two-col">
+      <section class="home-card glass">
+        <div class="compact-card-head"><div><span class="card-icon">□</span><div><b>終わってない課題</b><small>${unfinished.length}件</small></div></div><button class="mini-link" onclick="go('school')">一覧 ›</button></div>
+        <div class="home-list">${taskHtml}</div>
+      </section>
+      <section class="home-card glass">
+        <div class="compact-card-head"><div><span class="card-icon">◌</span><div><b>未読のチャット</b><small>${unreadChats.length}件</small></div></div><button class="mini-link" onclick="go('chat')">チャット ›</button></div>
+        <div class="home-list">${chatHtml}</div>
+      </section>
+    </div>
+    <section class="home-card glass home-notice-card">
+      <div class="compact-card-head"><div><span class="card-icon">♧</span><div><b>お知らせ</b><small>${notices.length}件の未読</small></div></div><button class="mini-link" onclick="api('/api/notifications/read',{method:'POST'}).then(()=>home($('#main'))).catch(x=>toast(x.message))">すべて既読</button></div>
+      <div class="home-notice-list">${noticeHtml}</div>
+    </section>
+  </div>`;
+  if(homeClockTimer)clearInterval(homeClockTimer);
+  const updateClock=()=>{const el=$('#homeClock');if(el)el.textContent=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});};
+  updateClock();
+  homeClockTimer=setInterval(updateClock,1000);
 }
 async function chat(m){if(!friends.length)friends=await api('/api/friends');m.innerHTML=`<div class="grid"><section class="glass card span4"><div class="h">FRIENDS</div>${friends.map(f=>`<div class="item row" onclick="openChat('${f.id}')"><div class="avatar">${esc(f.icon)}</div><div><b>${esc(f.displayName)}</b><div class="sub">タップしてチャット</div></div></div>`).join('')||'<p class="sub">友達がいません。「友達」から追加できます。</p>'}</section><section class="glass card span8"><div class="h">TALK</div><div id="chatbox" class="chat">${currentChat?await chatHtml(currentChat):'<p class="sub">友達を選択してください。</p>'}</div>${currentChat?`<form class="row" onsubmit="sendMsg(event)"><input class="input" name="text" placeholder="メッセージ"><button class="btn">送信</button></form>`:''}</section></div>`}
 async function chatHtml(id2){const ms=await api('/api/chats/'+id2);return ms.map(x=>`<div class="bubble ${x.from===me.id?'mine':''}">${esc(x.text)}<div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<p class="sub">まだメッセージはありません。</p>'}async function openChat(id2){currentChat=id2;go('chat')}async function sendMsg(e){e.preventDefault();const f=new FormData(e.target);await api('/api/chats/'+currentChat,{method:'POST',body:JSON.stringify({text:f.get('text')})});e.target.reset();chat($('#main'))}
@@ -268,7 +313,7 @@ function flash(id2){const a=window.NOVA_BOOKS?.[id2]||[];let i=0;$('#main').inne
 function fcNext(){const x=window.fc;x.i=(x.i+1)%x.a.length;$('#fc').textContent=x.a[x.i].q}
 function quiz(id2){const a=window.NOVA_BOOKS?.[id2]||[];let i=0;function q(){const x=a[i++%a.length];const opts=[x,...a.slice(i,i+3)].sort(()=>Math.random()-.5);$('#main').innerHTML=`<div class="glass card"><div class="h">4 CHOICE</div><div class="big">${esc(x.q)}</div><div class="stack">${opts.map(o=>`<button class="btn alt" onclick="toast(${JSON.stringify(o.a===x.a?'正解！':'不正解')});${o.a===x.a?'':'quiz(\''+id2+'\')'}">${esc(o.a)}</button>`).join('')}</div></div>`}q()}
 function spelling(id2){const a=window.NOVA_BOOKS?.[id2]||[];let x=a[Math.floor(Math.random()*a.length)];$('#main').innerHTML=`<div class="glass card"><div class="h">SPELLING</div><div class="big">${esc(x.a)}</div><input id="ans" class="input" placeholder="英単語を入力"><button class="btn" onclick="toast($('#ans').value.trim().toLowerCase()===${JSON.stringify(x.q.toLowerCase())}?'正解！':'不正解')">答え合わせ</button></div>`}
-async function settings(m){m.innerHTML=`<div class="grid"><section class="glass card span6"><div class="h">PROFILE</div><div class="row"><div class="avatar">${esc(me.icon)}</div><div><b>${esc(me.displayName)}</b><div class="sub">${esc(me.schoolName)} / ${esc(me.grade)}年 ${esc(me.className)}組</div></div></div><form class="stack" onsubmit="saveProfile(event)" style="margin-top:15px"><input class="input" name="displayName" value="${esc(me.displayName)}"><input class="input" name="icon" value="${esc(me.icon)}"><button class="btn">保存</button></form></section><section class="glass card span6"><div class="h">NOTIFICATION</div><label><input id="notif" type="checkbox" ${me.settings?.notifications?'checked':''}> プッシュ通知</label><br><label><input id="call" type="checkbox" ${me.settings?.callSound?'checked':''}> 通話着信音</label><p class="sub">ブラウザ/端末側の通知許可も必要です。</p></section></div>`}async function saveProfile(e){e.preventDefault();const f=new FormData(e.target);me=await api('/api/me',{method:'PATCH',body:JSON.stringify({displayName:f.get('displayName'),icon:f.get('icon'),settings:{notifications:$('#notif')?.checked??true,callSound:$('#call')?.checked??true}})});localStorage.novaUser=JSON.stringify(me);toast('保存しました');render()}
+async function settings(m){m.innerHTML=`<div class="grid"><section class="glass card span6"><div class="h">PROFILE</div><div class="row"><div class="avatar">${esc(me.icon)}</div><div><b>${esc(me.displayName)}</b><div class="sub">${esc(me.schoolName)} / ${esc(me.grade)}年 ${esc(me.className)}組</div></div></div><form class="stack" onsubmit="saveProfile(event)" style="margin-top:15px"><input class="input" name="displayName" value="${esc(me.displayName)}"><input class="input" name="icon" value="${esc(me.icon)}"><button class="btn">保存</button></form></section><section class="glass card span6"><div class="h">NOTIFICATION</div><label><input id="notif" type="checkbox" ${me.settings?.notifications?'checked':''}> プッシュ通知</label><br><label><input id="call" type="checkbox" ${me.settings?.callSound?'checked':''}> 通話着信音</label><p class="sub">ブラウザ/端末側の通知許可も必要です。</p></section></div>`}async function saveProfile(e){e.preventDefault();const f=new FormData(e.target);me=await api('/api/me',{method:'PATCH',body:JSON.stringify({displayName:f.get('displayName'),icon:f.get('icon'),settings:{notifications:$('#notif')?.checked??true,callSound:$('#call')?.checked??true}})});localStorage.novaUser=JSON.stringify(me);toast('保存しました');render(true)}
 document.addEventListener('click',e=>{
   const b=e.target.closest?.('.school-option');
   if(!b)return;
