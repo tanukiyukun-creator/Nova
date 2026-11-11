@@ -181,7 +181,14 @@ app.get('/api/users/search',auth,(req,res)=>{const db=load(),q=(req.query.q||'')
 app.post('/api/friends/:id',auth,(req,res)=>{const db=load(); if(!db.users.some(u=>u.id===req.params.id))return res.status(404).end(); if(!db.friends.some(f=>f.a===req.user.id&&f.b===req.params.id)){db.friends.push({a:req.user.id,b:req.params.id,createdAt:Date.now()});save(db)} res.json({ok:true})});
 app.get('/api/friends',auth,(req,res)=>{const db=load();const ids=db.friends.filter(f=>f.a===req.user.id||f.b===req.user.id).map(f=>f.a===req.user.id?f.b:f.a);res.json(db.users.filter(u=>ids.includes(u.id)).map(pub))});
 app.get('/api/chats/:otherId',auth,(req,res)=>{const db=load();res.json(db.messages.filter(m=>(m.from===req.user.id&&m.to===req.params.otherId)||(m.from===req.params.otherId&&m.to===req.user.id)).slice(-200))});
-app.post('/api/chats/:otherId',auth,(req,res)=>{const db=load();const m={id:id(),from:req.user.id,to:req.params.otherId,text:String(req.body.text||''),replyTo:req.body.replyTo||null,createdAt:Date.now()};if(!m.text.trim())return res.status(400).end();db.messages.push(m);notify(db,m.to,'message','新しいメッセージ',`${req.user.displayName}からメッセージが届きました`);save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message',message:m}))});res.json(m)});
+function buildMessage(req,from,to,talkId,type){
+  const text=String(req.body.text||'').trim(),image=String(req.body.image||''),sticker=String(req.body.sticker||'');
+  if(!text&&!image&&!sticker)throw new Error('メッセージが空です');
+  if(image&&(!image.startsWith('data:image/')||image.length>6*1024*1024))throw new Error('画像を送信できません');
+  return {id:id(),type,from,to:to||null,talkId:talkId||null,text,image,sticker,replyTo:req.body.replyTo||null,createdAt:Date.now(),readBy:[]};
+}
+app.post('/api/chats/:otherId',auth,(req,res)=>{try{const db=load();if(!db.users.some(u=>u.id===req.params.otherId))return res.status(404).json({error:'相手が見つかりません'});const m=buildMessage(req,req.user.id,req.params.otherId,null,'direct');db.messages.push(m);notify(db,m.to,'message','新しいメッセージ',req.user.displayName+'からメッセージが届きました');save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message',message:m}))});res.json(m)}catch(e){res.status(400).json({error:e.message})}});
+app.post('/api/chats/:otherId/read',auth,(req,res)=>{const db=load();db.messages.filter(m=>m.from===req.params.otherId&&m.to===req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
 app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifications.filter(n=>n.userId===req.user.id).slice(0,100))});
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
 function ensureTalk(db,user,room){
@@ -208,7 +215,7 @@ app.post('/api/talks/:room/messages',auth,(req,res)=>{
   const db=load(),talk=ensureTalk(db,req.user,room);
   if(!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このトークのメンバーではありません'});
   const text=String(req.body.text||'').trim();if(!text)return res.status(400).json({error:'メッセージを入力してください'});
-  const m={id:id(),type:'group',talkId:talk.id,from:req.user.id,text,createdAt:Date.now()};
+  const m=buildMessage(req,req.user.id,null,talk.id,'group');
   db.messages.push(m);talk.memberIds.filter(x=>x!==req.user.id).forEach(uid=>notify(db,uid,'group_message',talk.name,`${req.user.displayName}からメッセージが届きました`));
   save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:m,talkId:talk.id}))});res.json(m);
 });
@@ -233,14 +240,15 @@ app.post('/api/class/messages',auth,(req,res)=>{
   if(!talk){talk={id:id(),schoolId:req.user.schoolId,schoolName:req.user.schoolName,grade:req.user.grade,className:req.user.className,name:`${req.user.grade}年${req.user.className}組 クラストーク`,createdAt:Date.now(),memberIds:[]};db.classTalks.push(talk);}
   if(!talk.memberIds.includes(req.user.id))talk.memberIds.push(req.user.id);
   const text=String(req.body.text||'').trim();
-  if(!text)return res.status(400).json({error:'メッセージを入力してください'});
-  const m={id:id(),type:'class',talkId:talk.id,from:req.user.id,text,createdAt:Date.now()};
+  const m=buildMessage(req,req.user.id,null,talk.id,'class');
   db.messages.push(m);
   talk.memberIds.filter(x=>x!==req.user.id).forEach(userId=>notify(db,userId,'class_message',talk.name,`${req.user.displayName}からメッセージが届きました`));
   save(db);
   wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'class_message',message:m,talkId:talk.id}))});
   res.json(m);
 });
+app.post('/api/class/read',auth,(req,res)=>{const db=load();const talk=db.classTalks.find(x=>x.schoolId===req.user.schoolId&&x.grade===req.user.grade&&x.className===req.user.className);if(talk)db.messages.filter(m=>m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
+app.post('/api/talks/:room/read',auth,(req,res)=>{const db=load();const talk=ensureTalk(db,req.user,String(req.params.room));db.messages.filter(m=>m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
 app.get('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.query.kind||'class';res.json(db.posts.filter(p=>p.kind===kind&&p.schoolId===s.schoolId&&(kind==='school'||p.grade===s.grade)&&(kind!=='class'||p.className===s.className)).slice(0,100))});
 app.post('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.body.kind||'class'; if(!canManage(req.user,kind))return res.status(403).json({error:'権限がありません'});const p={id:id(),...s,kind,title:req.body.title||'',body:req.body.body||'',authorId:req.user.id,createdAt:Date.now()};db.posts.unshift(p);save(db);res.json(p)});
 function canManage(u,kind){if(u.role==='SUPER_ADMIN'||u.role==='SCHOOL_ADMIN')return true;if(kind==='grade')return ['GRADE_ADMIN'].includes(u.role);if(kind==='class')return ['CLASS_ADMIN','GRADE_ADMIN'].includes(u.role);return false}
@@ -258,6 +266,16 @@ app.get('/api/study/books',auth,(req,res)=>res.json([{id:'target1200',name:'タ�
 app.get('/data/:file', (req,res)=>{const base=path.join(__dirname,'data'); const file=path.basename(req.params.file); const allowed=new Set(['target1200.txt','target1900.txt','鉄壁.txt','irohani.txt']); if(!allowed.has(file))return res.status(404).end(); const p=path.join(base,file); if(!fs.existsSync(p))return res.status(404).json({error:'単語帳データが見つかりません'}); res.sendFile(p)});
 app.get('/api/admins',auth,(req,res)=>{const db=load();res.json(db.users.filter(u=>u.schoolId===req.user.schoolId&&u.role!=='STUDENT').map(pub))});
 app.get('/api/debug/state',auth,(req,res)=>{if(req.user.role!=='SUPER_ADMIN')return res.status(403).end();const db=load();res.json({...db,users:db.users.map(pub)});});
+app.post('/api/super/users/:id/role',auth,(req,res)=>{
+  if(req.user.role!=='SUPER_ADMIN')return res.status(403).json({error:'権限がありません'});
+  const allowed=['STUDENT','CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'];
+  const role=String(req.body.role||'STUDENT');
+  if(!allowed.includes(role))return res.status(400).json({error:'不正な権限です'});
+  const db=load(),u=db.users.find(x=>x.id===req.params.id);
+  if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});
+  if(u.id===req.user.id&&role!=='SUPER_ADMIN')return res.status(400).json({error:'SUPER ADMIN本人はSUPER ADMINのまま利用してください'});
+  u.role=role;save(db);res.json({ok:true,user:pub(u)});
+});
 app.post('/api/super/users/:id/ban',auth,(req,res)=>{
   if(req.user.role!=='SUPER_ADMIN')return res.status(403).json({error:'権限がありません'});
   const db=load(),u=db.users.find(x=>x.id===req.params.id);
@@ -308,6 +326,35 @@ function promoteOwnerToSuperAdmin(){
   }
 }
 promoteOwnerToSuperAdmin();
-wss.on('connection',ws=>{ws.on('message',()=>{});});
+const wsUsers=new Map();
+function userFromWsToken(raw){
+  try{
+    const [b,s]=String(raw||'').split('.');
+    if(!b||!s)return null;
+    const secret=process.env.NOVA_SECRET||'nova-dev-secret-change-me';
+    const expected=crypto.createHmac('sha256',secret).update(b).digest('base64url');
+    if(s.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(s),Buffer.from(expected)))return null;
+    const p=JSON.parse(Buffer.from(b,'base64url').toString('utf8'));
+    if(!p.id||!p.exp||p.exp<Date.now())return null;
+    const db=load(),u=db.users.find(x=>x.id===p.id);
+    return u&&!u.banned?u:null;
+  }catch{return null}
+}
+wss.on('connection',(ws,req)=>{
+  const q=new URL(req.url,'http://localhost').searchParams;
+  const u=userFromWsToken(q.get('token'));
+  if(!u){ws.close(1008,'auth');return}
+  ws.userId=u.id;wsUsers.set(u.id,ws);
+  ws.on('message',raw=>{
+    try{
+      const m=JSON.parse(String(raw));
+      if(m.type==='call_signal'&&m.toUserId){
+        const target=wsUsers.get(m.toUserId);
+        if(target?.readyState===1)target.send(JSON.stringify({...m,fromUserId:u.id}));
+      }
+    }catch{}
+  });
+  ws.on('close',()=>{if(wsUsers.get(u.id)===ws)wsUsers.delete(u.id)});
+});
 app.use((req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 server.listen(process.env.PORT||3000,()=>console.log('Nova running on http://localhost:'+(process.env.PORT||3000)));
