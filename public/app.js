@@ -176,7 +176,8 @@ async function register(e){
   };
   try{
     setSession(await api('/api/register',{method:'POST',body:JSON.stringify(body)}));
-    view='home';
+    view='chat';
+    chatRoom='class';
     await render(true);
     toast('登録が完了しました。ホーム画面へ移動しました');
   }catch(x){toast(x.message)}
@@ -193,7 +194,8 @@ async function login(e){
   if(!body.schoolName||!body.lastName||!body.firstName||!body.password)return toast('学校名・姓・名・パスワードを入力してください');
   try{
     setSession(await api('/api/login',{method:'POST',body:JSON.stringify(body)}));
-    view='home';
+    view='chat';
+    chatRoom='class';
     await render(true);
     toast('ログインしました');
   }catch(x){toast(x.message)}
@@ -276,8 +278,47 @@ async function home(m){
   updateClock();
   homeClockTimer=setInterval(updateClock,1000);
 }
-async function chat(m){if(!friends.length)friends=await api('/api/friends');m.innerHTML=`<div class="grid"><section class="glass card span4"><div class="h">FRIENDS</div>${friends.map(f=>`<div class="item row" onclick="openChat('${f.id}')"><div class="avatar">${esc(f.icon)}</div><div><b>${esc(f.displayName)}</b><div class="sub">タップしてチャット</div></div></div>`).join('')||'<p class="sub">友達がいません。「友達」から追加できます。</p>'}</section><section class="glass card span8"><div class="h">TALK</div><div id="chatbox" class="chat">${currentChat?await chatHtml(currentChat):'<p class="sub">友達を選択してください。</p>'}</div>${currentChat?`<form class="row" onsubmit="sendMsg(event)"><input class="input" name="text" placeholder="メッセージ"><button class="btn">送信</button></form>`:''}</section></div>`}
-async function chatHtml(id2){const ms=await api('/api/chats/'+id2);return ms.map(x=>`<div class="bubble ${x.from===me.id?'mine':''}">${esc(x.text)}<div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<p class="sub">まだメッセージはありません。</p>'}async function openChat(id2){currentChat=id2;go('chat')}async function sendMsg(e){e.preventDefault();const f=new FormData(e.target);await api('/api/chats/'+currentChat,{method:'POST',body:JSON.stringify({text:f.get('text')})});e.target.reset();chat($('#main'))}
+let chatRoom='class';
+let chatTarget=null;
+async function chat(m){
+  const rooms=[{id:'class',title:`${me.grade}年${me.className}組 クラストーク`,sub:'クラス全員'},
+    {id:'classadmin',title:'CLASS ADMIN トーク',sub:'クラス管理者'},
+    {id:'gradeadmin',title:`${me.grade}年 GRADE ADMIN トーク`,sub:'学年管理者'}];
+  let friendHtml='';
+  if(!friends.length)friends=await api('/api/friends');
+  const activeRooms=rooms.map(r=>`<button class="chat-room ${chatRoom===r.id?'on':''}" onclick="selectChatRoom('${r.id}')"><span class="room-icon">${r.id==='class'?'C':r.id==='classadmin'?'A':'G'}</span><span><b>${esc(r.title)}</b><small>${esc(r.sub)}</small></span></button>`).join('');
+  const friendItems=friends.map(f=>`<button class="chat-room ${chatRoom==='friend'&&chatTarget===f.id?'on':''}" onclick="openChat('${f.id}')"><span class="avatar small-avatar">${f.icon?'<img src="'+esc(f.icon)+'">':'N'}</span><span><b>${esc(f.displayName)}</b><small>個人チャット</small></span></button>`).join('');
+  m.innerHTML=`<div class="chat-layout">
+    <aside class="glass chat-sidebar">
+      <div class="chat-sidebar-title"><div class="eyebrow">NOVA CHAT</div><h2>チャット</h2></div>
+      <div class="chat-section-label">学校トーク</div>
+      ${activeRooms}
+      <div class="chat-section-label">友達</div>
+      ${friendItems||'<p class="sub chat-empty">友達はまだいません</p>'}
+    </aside>
+    <section class="glass chat-main-panel">
+      <div id="chatbox" class="chat chat-main-box">${chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom)}</div>
+      ${(chatRoom==='friend'&&chatTarget)||['class','classadmin','gradeadmin'].includes(chatRoom)?`<form class="row chat-send-form" onsubmit="sendCurrentChat(event)"><input class="input" name="text" placeholder="メッセージ"><button class="btn">送信</button></form>`:''}
+    </section>
+  </div>`;
+}
+async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
+async function groupChatHtml(room){
+  const data=await api('/api/talks/'+room);
+  return (data.messages||[]).map(x=>`<div class="bubble ${x.from===me.id?'mine':''}"><div class="sub">${x.from===me.id?'あなた':esc(x.fromName||'メンバー')}</div>${esc(x.text)}<div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<p class="sub">まだメッセージはありません。</p>';
+}
+async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
+async function sendCurrentChat(e){
+  e.preventDefault();
+  const f=new FormData(e.target),text=String(f.get('text')||'').trim();
+  if(!text)return;
+  try{
+    if(chatRoom==='friend')await api('/api/chats/'+chatTarget,{method:'POST',body:JSON.stringify({text})});
+    else await api('/api/talks/'+chatRoom+'/messages',{method:'POST',body:JSON.stringify({text})});
+    e.target.reset();chat($('#main'));
+  }catch(x){toast(x.message)}
+}
+async function chatHtml(id2){const ms=await api('/api/chats/'+id2);return ms.map(x=>`<div class="bubble ${x.from===me.id?'mine':''}">${esc(x.text)}<div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<p class="sub">まだメッセージはありません。</p>'}
 async function school(m){
   const [cls,events,tasks,schedule,elections]=await Promise.all([api('/api/class'),api('/api/events'),api('/api/tasks'),api('/api/schedule'),api('/api/elections')]);
   const posts=await api('/api/posts?kind=class');
@@ -313,7 +354,73 @@ function flash(id2){const a=window.NOVA_BOOKS?.[id2]||[];let i=0;$('#main').inne
 function fcNext(){const x=window.fc;x.i=(x.i+1)%x.a.length;$('#fc').textContent=x.a[x.i].q}
 function quiz(id2){const a=window.NOVA_BOOKS?.[id2]||[];let i=0;function q(){const x=a[i++%a.length];const opts=[x,...a.slice(i,i+3)].sort(()=>Math.random()-.5);$('#main').innerHTML=`<div class="glass card"><div class="h">4 CHOICE</div><div class="big">${esc(x.q)}</div><div class="stack">${opts.map(o=>`<button class="btn alt" onclick="toast(${JSON.stringify(o.a===x.a?'正解！':'不正解')});${o.a===x.a?'':'quiz(\''+id2+'\')'}">${esc(o.a)}</button>`).join('')}</div></div>`}q()}
 function spelling(id2){const a=window.NOVA_BOOKS?.[id2]||[];let x=a[Math.floor(Math.random()*a.length)];$('#main').innerHTML=`<div class="glass card"><div class="h">SPELLING</div><div class="big">${esc(x.a)}</div><input id="ans" class="input" placeholder="英単語を入力"><button class="btn" onclick="toast($('#ans').value.trim().toLowerCase()===${JSON.stringify(x.q.toLowerCase())}?'正解！':'不正解')">答え合わせ</button></div>`}
-async function settings(m){m.innerHTML=`<div class="grid"><section class="glass card span6"><div class="h">PROFILE</div><div class="row"><div class="avatar">${esc(me.icon)}</div><div><b>${esc(me.displayName)}</b><div class="sub">${esc(me.schoolName)} / ${esc(me.grade)}年 ${esc(me.className)}組</div></div></div><form class="stack" onsubmit="saveProfile(event)" style="margin-top:15px"><input class="input" name="displayName" value="${esc(me.displayName)}"><input class="input" name="icon" value="${esc(me.icon)}"><button class="btn">保存</button></form></section><section class="glass card span6"><div class="h">NOTIFICATION</div><label><input id="notif" type="checkbox" ${me.settings?.notifications?'checked':''}> プッシュ通知</label><br><label><input id="call" type="checkbox" ${me.settings?.callSound?'checked':''}> 通話着信音</label><p class="sub">ブラウザ/端末側の通知許可も必要です。</p></section></div>`}async function saveProfile(e){e.preventDefault();const f=new FormData(e.target);me=await api('/api/me',{method:'PATCH',body:JSON.stringify({displayName:f.get('displayName'),icon:f.get('icon'),settings:{notifications:$('#notif')?.checked??true,callSound:$('#call')?.checked??true}})});localStorage.novaUser=JSON.stringify(me);toast('保存しました');render(true)}
+async function settings(m){
+  m.innerHTML=`<div class="settings-page">
+    <div class="settings-header"><div class="eyebrow">ACCOUNT SETTINGS</div><h1>設定</h1><p>Novaのアカウント情報を変更できます。</p></div>
+    <form class="settings-form" onsubmit="saveProfile(event)">
+      <section class="glass card settings-card">
+        <div class="settings-card-title"><b>アカウント</b><span>基本情報</span></div>
+        <div class="settings-avatar-row">
+          <div class="avatar settings-avatar">${me.icon?'<img src="'+esc(me.icon)+'">':'N'}</div>
+          <label class="btn alt photo-btn">アイコン写真を変更<input id="settingsIconFile" type="file" accept="image/*" hidden onchange="settingsPhoto(event)"></label>
+        </div>
+        <div class="settings-grid">
+          <label><span>所属学校</span><input class="input" name="schoolName" value="${esc(me.schoolName||'')}" required></label>
+          <label><span>学年</span><select class="input" name="grade"><option value="1" ${me.grade==='1'?'selected':''}>1年</option><option value="2" ${me.grade==='2'?'selected':''}>2年</option><option value="3" ${me.grade==='3'?'selected':''}>3年</option></select></label>
+          <label><span>クラス</span><input class="input" name="className" value="${esc(me.className||'')}" required></label>
+          <label><span>姓</span><input class="input" name="lastName" value="${esc(me.lastName||'')}" required></label>
+          <label><span>名</span><input class="input" name="firstName" value="${esc(me.firstName||'')}" required></label>
+        </div>
+      </section>
+      <section class="glass card settings-card">
+        <div class="settings-card-title"><b>パスワード</b><span>変更する場合のみ入力</span></div>
+        <div class="settings-grid">
+          <label><span>現在のパスワード</span><input class="input" type="password" name="currentPassword" autocomplete="current-password"></label>
+          <label><span>新しいパスワード</span><input class="input" type="password" name="newPassword" minlength="6" autocomplete="new-password"></label>
+          <label><span>新しいパスワード（確認）</span><input class="input" type="password" name="newPassword2" minlength="6" autocomplete="new-password"></label>
+        </div>
+      </section>
+      <section class="glass card settings-card">
+        <div class="settings-card-title"><b>通知・通話</b><span>端末通知とは別にNova側で設定</span></div>
+        <label class="setting-check"><input id="notif" type="checkbox" ${me.settings?.notifications?'checked':''}> プッシュ通知</label>
+        <label class="setting-check"><input id="call" type="checkbox" ${me.settings?.callSound?'checked':''}> 通話着信音</label>
+      </section>
+      <div class="settings-actions"><button class="btn primary-btn" type="submit">変更を保存</button></div>
+    </form>
+  </div>`
+}
+function settingsPhoto(e){
+  const f=e.target.files?.[0];if(!f)return;
+  if(!f.type.startsWith('image/'))return toast('画像ファイルを選択してください');
+  if(f.size>4*1024*1024)return toast('写真は4MB以下にしてください');
+  const r=new FileReader();r.onload=()=>{window._settingsIcon=r.result;settings($('#main'))};r.readAsDataURL(f);
+}
+async function saveProfile(e){
+  e.preventDefault();
+  const f=new FormData(e.target);
+  const newPassword=String(f.get('newPassword')||''),newPassword2=String(f.get('newPassword2')||'');
+  if(newPassword!==newPassword2)return toast('新しいパスワードが一致しません');
+  if(newPassword&&newPassword.length<6)return toast('パスワードは6文字以上にしてください');
+  if(newPassword&&!String(f.get('currentPassword')||''))return toast('現在のパスワードを入力してください');
+  try{
+    me=await api('/api/me',{method:'PATCH',body:JSON.stringify({
+      schoolName:String(f.get('schoolName')||'').trim(),
+      grade:String(f.get('grade')||''),
+      className:String(f.get('className')||'').trim(),
+      lastName:String(f.get('lastName')||'').trim(),
+      firstName:String(f.get('firstName')||'').trim(),
+      icon:window._settingsIcon??me.icon,
+      currentPassword:String(f.get('currentPassword')||''),
+      newPassword
+      ,settings:{notifications:$('#notif')?.checked??true,callSound:$('#call')?.checked??true}
+    })});
+    window._settingsIcon=undefined;
+    localStorage.novaUser=JSON.stringify(me);
+    toast('設定を保存しました');
+    render(true);
+  }catch(x){toast(x.message)}
+}
+
 document.addEventListener('click',e=>{
   const b=e.target.closest?.('.school-option');
   if(!b)return;
