@@ -194,7 +194,7 @@ async function login(e){
   try{
     setSession(await api('/api/login',{method:'POST',body:JSON.stringify(body)}));
     view='home';
-    await render();
+    await render(true);
     toast('ログインしました');
   }catch(x){toast(x.message)}
 }
