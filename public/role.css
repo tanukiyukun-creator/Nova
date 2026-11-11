@@ -1,0 +1,8 @@
+/* Nova role identity layer */
+.role-badge{margin:4px 6px 16px;padding:11px 12px;border:1px solid rgba(255,255,255,.10);border-radius:14px;background:rgba(255,255,255,.035);position:relative;overflow:hidden}
+.role-badge:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--role-accent,#d9c18a)}
+.role-badge span{display:block;font-size:8px;letter-spacing:.18em;color:#7f858f;margin-bottom:5px}
+.role-badge strong{display:block;font-size:12px;letter-spacing:.04em;color:#f4f0e7}
+.role-student{--role-accent:#b9c0ca}.role-class_admin{--role-accent:#6fa9ff}.role-grade_admin{--role-accent:#ad86ff}.role-school_admin{--role-accent:#dfbd67}.role-super_admin{--role-accent:#f0d38d}
+.role-class_admin .role-badge{background:linear-gradient(135deg,rgba(74,126,200,.12),rgba(255,255,255,.025))}.role-grade_admin .role-badge{background:linear-gradient(135deg,rgba(130,83,205,.14),rgba(255,255,255,.025))}.role-school_admin .role-badge{background:linear-gradient(135deg,rgba(183,142,55,.15),rgba(255,255,255,.025))}.role-super_admin .role-badge{background:linear-gradient(135deg,rgba(207,169,76,.18),rgba(255,255,255,.025));border-color:rgba(224,195,126,.22);box-shadow:0 12px 35px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.06)}
+@media(max-width:850px){.role-badge{display:none}}
