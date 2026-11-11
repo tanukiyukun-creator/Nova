@@ -18,7 +18,7 @@ function id(){return crypto.randomBytes(12).toString('hex')}
 function hash(p,s=crypto.randomBytes(16).toString('hex')){return `${s}:${crypto.scryptSync(p,s,64).toString('hex')}`}
 function verify(p,h){const [s,x]=h.split(':'); return crypto.timingSafeEqual(Buffer.from(x,'hex'),crypto.scryptSync(p,s,64))}
 function token(u){const raw=JSON.stringify({id:u.id,exp:Date.now()+1000*60*60*24*30}); const b=Buffer.from(raw).toString('base64url'); const sig=crypto.createHmac('sha256',process.env.NOVA_SECRET||'nova-dev-secret-change-me').update(b).digest('base64url'); return b+'.'+sig}
-function auth(req,res,next){const t=(req.headers.authorization||'').replace('Bearer ',''); try{const [b,s]=t.split('.'); const ok=crypto.timingSafeEqual(Buffer.from(s||''),Buffer.from(crypto.createHmac('sha256',process.env.NOVA_SECRET||'nova-dev-secret-change-me').update(b||'').digest('base64url'))); const p=JSON.parse(Buffer.from(b,'base64url')); if(!ok||p.exp<Date.now()) throw 0; const db=load(); req.user=db.users.find(x=>x.id===p.id); if(!req.user)throw 0; next()}catch{res.status(401).json({error:'認証が必要です'})}}
+function auth(req,res,next){const t=(req.headers.authorization||'').replace('Bearer ',''); try{const [b,s]=t.split('.'); const ok=crypto.timingSafeEqual(Buffer.from(s||''),Buffer.from(crypto.createHmac('sha256',process.env.NOVA_SECRET||'nova-dev-secret-change-me').update(b||'').digest('base64url'))); const p=JSON.parse(Buffer.from(b,'base64url')); if(!ok||p.exp<Date.now()) throw 0; const db=load(); req.user=db.users.find(x=>x.id===p.id); if(!req.user||req.user.banned)throw 0; next()}catch{res.status(401).json({error:'認証が必要です'})}}
 function pub(u){const {passwordHash,...x}=u;return x}
 function notify(db,userId,type,title,body){db.notifications.unshift({id:id(),userId,type,title,body,read:false,createdAt:Date.now()});}
 function sameGroup(a,b){return a.schoolId===b.schoolId&&a.grade===b.grade&&a.className===b.className}
@@ -81,7 +81,7 @@ app.post('/api/login',(req,res)=>{
   const displayName=String(req.body.displayName||'').trim().replace(/\s+/g,' ');
   const names=[lastName+' '+firstName,displayName].filter(Boolean);
   const u=db.users.find(x=>String(x.schoolName||'').trim()===schoolName&&names.includes(String(x.displayName||'').trim()));
-  if(!u||!verify(password,u.passwordHash))return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
+  if(!u||u.banned||!verify(password,u.passwordHash))return res.status(401).json({error:u?.banned?'このアカウントは利用停止中です':'学校名・氏名・パスワードを確認してください'});
   res.json({token:token(u),user:pub(u)});
 });
 app.post('/api/super/login',(req,res)=>{const password=String(req.body.password||''); const expectedPassword=process.env.NOVA_SUPER_PASSWORD||'change-this-before-production'; if(!password||password!==expectedPassword)return res.status(401).json({error:'管理パスワードが正しくありません'}); const db=load(); let u=db.users.find(x=>x.role==='SUPER_ADMIN'&&x.id==='nova-super-admin'); if(!u){u={id:'nova-super-admin',schoolId:'nova-system',schoolName:'Nova System',grade:'0',className:'SYSTEM',attendanceNo:'',lastName:'Nova',firstName:'Super Admin',displayName:'Nova Super Admin',icon:'',passwordHash:hash(password),role:'SUPER_ADMIN',createdAt:Date.now(),settings:{notifications:true,callSound:true}};db.users.push(u);save(db)} res.json({token:token(u),user:pub(u)})});
@@ -112,6 +112,21 @@ app.get('/api/study/books',auth,(req,res)=>res.json([{id:'target1200',name:'タ�
 app.get('/data/:file', (req,res)=>{const base=path.join(__dirname,'data'); const file=path.basename(req.params.file); const allowed=new Set(['target1200.txt','target1900.txt','鉄壁.txt','irohani.txt']); if(!allowed.has(file))return res.status(404).end(); const p=path.join(base,file); if(!fs.existsSync(p))return res.status(404).json({error:'単語帳データが見つかりません'}); res.sendFile(p)});
 app.get('/api/admins',auth,(req,res)=>{const db=load();res.json(db.users.filter(u=>u.schoolId===req.user.schoolId&&u.role!=='STUDENT').map(pub))});
 app.get('/api/debug/state',auth,(req,res)=>{if(req.user.role!=='SUPER_ADMIN')return res.status(403).end();const db=load();res.json({...db,users:db.users.map(pub)});});
+app.post('/api/super/users/:id/ban',auth,(req,res)=>{
+  if(req.user.role!=='SUPER_ADMIN')return res.status(403).json({error:'権限がありません'});
+  const db=load(),u=db.users.find(x=>x.id===req.params.id);
+  if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});
+  if(u.role==='SUPER_ADMIN')return res.status(400).json({error:'SUPER ADMINはBANできません'});
+  u.banned=true;u.bannedAt=Date.now();u.banReason=String(req.body.reason||'SUPER ADMINによる利用停止');
+  save(db);res.json({ok:true,user:pub(u)});
+});
+app.post('/api/super/users/:id/unban',auth,(req,res)=>{
+  if(req.user.role!=='SUPER_ADMIN')return res.status(403).json({error:'権限がありません'});
+  const db=load(),u=db.users.find(x=>x.id===req.params.id);
+  if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});
+  u.banned=false;delete u.bannedAt;delete u.banReason;save(db);res.json({ok:true,user:pub(u)});
+});
+
 
 wss.on('connection',ws=>{ws.on('message',()=>{});});
 app.use((req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
