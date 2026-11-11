@@ -176,15 +176,9 @@ async function register(e){
   };
   try{
     setSession(await api('/api/register',{method:'POST',body:JSON.stringify(body)}));
-    view='school';
+    view='home';
     await render();
-    const classTalk=document.querySelector('.class-talk-card');
-    if(classTalk){
-      classTalk.scrollIntoView({behavior:'smooth',block:'start'});
-      toast('登録が完了しました。クラストークへ移動しました');
-    }else{
-      toast('登録は完了しましたが、クラストークを表示できませんでした。');
-    }
+    toast('登録が完了しました');
   }catch(x){toast(x.message)}
 }
 async function login(e){
