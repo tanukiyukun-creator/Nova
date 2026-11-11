@@ -176,9 +176,9 @@ async function register(e){
   };
   try{
     setSession(await api('/api/register',{method:'POST',body:JSON.stringify(body)}));
-    view='home';
+    view='school';
     await render();
-    toast('登録が完了しました');
+    toast('登録が完了しました。クラストークへようこそ');
   }catch(x){toast(x.message)}
 }
 async function login(e){
@@ -233,7 +233,29 @@ async function home(m){
 }
 async function chat(m){if(!friends.length)friends=await api('/api/friends');m.innerHTML=`<div class="grid"><section class="glass card span4"><div class="h">FRIENDS</div>${friends.map(f=>`<div class="item row" onclick="openChat('${f.id}')"><div class="avatar">${esc(f.icon)}</div><div><b>${esc(f.displayName)}</b><div class="sub">タップしてチャット</div></div></div>`).join('')||'<p class="sub">友達がいません。「友達」から追加できます。</p>'}</section><section class="glass card span8"><div class="h">TALK</div><div id="chatbox" class="chat">${currentChat?await chatHtml(currentChat):'<p class="sub">友達を選択してください。</p>'}</div>${currentChat?`<form class="row" onsubmit="sendMsg(event)"><input class="input" name="text" placeholder="メッセージ"><button class="btn">送信</button></form>`:''}</section></div>`}
 async function chatHtml(id2){const ms=await api('/api/chats/'+id2);return ms.map(x=>`<div class="bubble ${x.from===me.id?'mine':''}">${esc(x.text)}<div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<p class="sub">まだメッセージはありません。</p>'}async function openChat(id2){currentChat=id2;go('chat')}async function sendMsg(e){e.preventDefault();const f=new FormData(e.target);await api('/api/chats/'+currentChat,{method:'POST',body:JSON.stringify({text:f.get('text')})});e.target.reset();chat($('#main'))}
-async function school(m){const [posts,events,tasks,schedule,elections]=await Promise.all([api('/api/posts?kind=class'),api('/api/events'),api('/api/tasks'),api('/api/schedule'),api('/api/elections')]);m.innerHTML=`<div class="tabs"><button class="on">クラストーク</button><button onclick="schoolGrade()">学年</button><button onclick="schoolSchool()">学校</button><button onclick="adminPanel()">管理</button></div><div class="grid"><section class="glass card span8"><div class="h">CLASS BOARD</div>${posts.map(p=>`<div class="item"><b>${esc(p.title)}</b><p>${esc(p.body)}</p><div class="sub">${new Date(p.createdAt).toLocaleString('ja-JP')}</div></div>`).join('')||'<p class="sub">投稿はありません</p>'}</section><section class="glass card span4"><div class="h">SCHEDULE</div>${schedule.slice(0,8).map(x=>`<div class="item"><b>${esc(x.day)} ${esc(x.period)}限</b><div>${esc(x.subject)}</div><div class="sub">${esc(x.room)}</div></div>`).join('')||'<p class="sub">時間割は未登録</p>'}</section><section class="glass card span12"><div class="h">ELECTIONS</div>${elections.map(e=>`<div class="item"><b>${esc(e.type)}</b> <span class="sub">${e.status}</span><div class="row">${e.candidates.map(c=>`<button class="btn alt" onclick="vote('${e.id}','${c.id}')">${esc(c.name)} (${c.votes})</button>`).join('')}</div></div>`).join('')||'<p class="sub">進行中の投票はありません</p>'}</section></div>`}
+async function school(m){
+  const [cls,events,tasks,schedule,elections]=await Promise.all([api('/api/class'),api('/api/events'),api('/api/tasks'),api('/api/schedule'),api('/api/elections')]);
+  const posts=await api('/api/posts?kind=class');
+m.innerHTML=`<div class="tabs"><button class="on">クラストーク</button><button onclick="schoolGrade()">学年</button><button onclick="schoolSchool()">学校</button><button onclick="adminPanel()">管理</button></div>
+<div class="grid">
+<section class="glass card span8 class-talk-card">
+  <div class="class-talk-head"><div><div class="h">${esc(cls.talk.name)}</div><div class="sub">${cls.members.length}人 · クラス全員のトーク</div></div></div>
+  <div id="classChatBox" class="chat class-chat-box">${classChatHtml(cls.messages)}</div>
+  <form class="row" onsubmit="sendClassMsg(event)"><input class="input" name="text" placeholder="クラスにメッセージを送る" autocomplete="off"><button class="btn">送信</button></form>
+</section>
+<section class="glass card span4"><div class="h">CLASS BOARD</div>${posts.map(p=>`<div class="item"><b>${esc(p.title)}</b><p>${esc(p.body)}</p><div class="sub">${new Date(p.createdAt).toLocaleString('ja-JP')}</div></div>`).join('')||'<p class="sub">投稿はありません</p>'}</section>
+<section class="glass card span4"><div class="h">SCHEDULE</div>${schedule.slice(0,8).map(x=>`<div class="item"><b>${esc(x.day)} ${esc(x.period)}限</b><div>${esc(x.subject)}</div><div class="sub">${esc(x.room)}</div></div>`).join('')||'<p class="sub">時間割は未登録</p>'}</section>
+<section class="glass card span12"><div class="h">ELECTIONS</div>${elections.map(e=>`<div class="item"><b>${esc(e.type)}</b> <span class="sub">${e.status}</span><div class="row">${e.candidates.map(c=>`<button class="btn alt" onclick="vote('${e.id}','${c.id}')">${esc(c.name)} (${c.votes})</button>`).join('')}</div></div>`).join('')||'<p class="sub">進行中の投票はありません</p>'}</section></div>`
+function classChatHtml(messages){
+  return (messages||[]).map(x=>`<div class="bubble ${x.from===me.id?'mine':''}"><div class="sub">${x.from===me.id?'あなた':esc(x.fromName||'クラスメンバー')}</div>${esc(x.text)}<div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<p class="sub">まだメッセージはありません。最初のメッセージを送ってみましょう。</p>';
+}
+async function sendClassMsg(e){
+  e.preventDefault();
+  const f=new FormData(e.target);
+  const text=String(f.get('text')||'').trim();
+  if(!text)return;
+  try{await api('/api/class/messages',{method:'POST',body:JSON.stringify({text})});e.target.reset();school($('#main'));}catch(x){toast(x.message)}
+}
 async function schoolGrade(){view='school';const m=$('#main');const p=await api('/api/posts?kind=grade');m.innerHTML=`<div class="glass card"><div class="h">GRADE BOARD</div>${p.map(x=>`<div class="item"><b>${esc(x.title)}</b><p>${esc(x.body)}</p></div>`).join('')||'<p class="sub">投稿はありません</p>'}</div>`}async function schoolSchool(){const p=await api('/api/posts?kind=school');$('#main').innerHTML=`<div class="glass card"><div class="h">SCHOOL BOARD</div>${p.map(x=>`<div class="item"><b>${esc(x.title)}</b><p>${esc(x.body)}</p></div>`).join('')||'<p class="sub">投稿はありません</p>'}</div>`}
 async function vote(e,c){try{await api('/api/elections/'+e+'/vote',{method:'POST',body:JSON.stringify({candidateId:c})});toast('投票しました');school($('#main'))}catch(x){toast(x.message)}}
 async function adminPanel(){const admins=await api('/api/admins');$('#main').innerHTML=`<div class="grid"><section class="glass card span6"><div class="h">ADMINISTRATORS</div>${admins.map(a=>`<div class="item row"><div class="avatar">${esc(a.icon)}</div><div><b>${esc(a.displayName)}</b><div class="sub">${esc(a.role)}</div></div></div>`).join('')||'<p class="sub">管理者はいません</p>'}</section><section class="glass card span6"><div class="h">ELECTION START</div><p class="sub">候補者を選んで管理者選挙を開始します。</p><button class="btn alt" onclick="startElection('CLASS_ADMIN')">CLASS_ADMIN選挙</button><button class="btn alt" onclick="startElection('GRADE_ADMIN')">GRADE_ADMIN選挙</button><button class="btn alt" onclick="startElection('SCHOOL_ADMIN')">SCHOOL_ADMIN選挙</button></section></div>`}async function startElection(type){const us=await api('/api/users/search?q=');const ids=us.slice(0,5).map(x=>x.id);try{await api('/api/elections',{method:'POST',body:JSON.stringify({type,candidateIds:ids})});toast('選挙を開始しました');school($('#main'))}catch(x){toast(x.message)}}
