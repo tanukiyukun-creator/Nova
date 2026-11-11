@@ -246,3 +246,25 @@ button:active,.btn:active{transform:scale(.98)}
 .call-window{position:fixed;right:22px;bottom:22px;width:min(440px,calc(100vw - 32px));z-index:10000;overflow:hidden}.call-head{display:flex;justify-content:space-between;padding:13px 16px}.call-head button{border:0;background:none;color:#fff;font-size:22px}.call-stage{min-height:240px;background:#05070b;display:grid;place-items:center;position:relative}.call-stage video{max-width:100%;max-height:55vh}.call-stage #localVideo{position:absolute;right:10px;bottom:10px;width:120px;border-radius:12px}.call-controls{display:flex;justify-content:center;padding:13px}.call-controls button{border:0;border-radius:12px;padding:10px 24px}
 @media(max-width:900px){.chat-layout{grid-template-columns:1fr}.chat-sidebar{max-height:220px}.chat-main-panel{min-height:calc(100vh - 330px)}.chat-main-box{min-height:360px;padding:16px}.bubble{max-width:86%}}
 @media(max-width:600px){.chat-sidebar{max-height:180px}.chat-header{padding:10px 12px}.chat-main-box{padding:12px 9px}.chat-compose{padding:9px}.chat-tool{width:38px;height:38px}.chat-input-large,.chat-send{height:44px!important}.chat-send{padding:0 14px}.sticker-panel{right:8px;bottom:72px}}
+
+
+/* ===== Nova role hierarchy themes ===== */
+.app-shell{--role-accent:#c9b77d;--role-accent-soft:rgba(201,183,125,.16);--role-line:rgba(201,183,125,.28)}
+.app-shell .logo span,.app-shell .sidebar button.active b{color:var(--role-accent)}
+.app-shell .sidebar button.active{background:linear-gradient(90deg,var(--role-accent-soft),rgba(255,255,255,.025));box-shadow:inset 2px 0 0 var(--role-accent)}
+.app-shell .top-actions .avatar{border-color:var(--role-line)}
+.app-shell .glass{border-color:var(--role-line)}
+.app-shell.role-student{--role-accent:#c9b77d;--role-accent-soft:rgba(201,183,125,.12);--role-line:rgba(201,183,125,.22)}
+.app-shell.role-class_admin{--role-accent:#73a9ff;--role-accent-soft:rgba(115,169,255,.13);--role-line:rgba(115,169,255,.25)}
+.app-shell.role-grade_admin{--role-accent:#b28cff;--role-accent-soft:rgba(178,140,255,.14);--role-line:rgba(178,140,255,.27)}
+.app-shell.role-school_admin{--role-accent:#d8b86c;--role-accent-soft:rgba(216,184,108,.16);--role-line:rgba(216,184,108,.3)}
+.app-shell.role-super_admin{--role-accent:#e5c76f;--role-accent-soft:rgba(229,199,111,.18);--role-line:rgba(229,199,111,.34)}
+.app-shell.role-class_admin .topbar h1:after,
+.app-shell.role-grade_admin .topbar h1:after,
+.app-shell.role-school_admin .topbar h1:after,
+.app-shell.role-super_admin .topbar h1:after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 0 4px 9px;background:var(--role-accent);box-shadow:0 0 12px var(--role-accent)}
+.app-shell.role-class_admin .sidebar,
+.app-shell.role-grade_admin .sidebar,
+.app-shell.role-school_admin .sidebar,
+.app-shell.role-super_admin .sidebar{box-shadow:inset -1px 0 0 var(--role-line),0 18px 60px rgba(0,0,0,.18)}
+.app-shell.role-super_admin{background:radial-gradient(circle at 85% 8%,rgba(229,199,111,.055),transparent 28%),var(--bg)}
