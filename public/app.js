@@ -279,6 +279,7 @@ async function home(m){
 let chatRoom='class';
 let chatTarget=null;
 async function chat(m){
+  wsConnect();
   const rooms=[{id:'class',title:`${me.grade}年${me.className}組 クラストーク`,sub:'クラス全員'},
     {id:'classadmin',title:'CLASS ADMIN トーク',sub:'クラス管理者'},
     {id:'gradeadmin',title:`${me.grade}年 GRADE ADMIN トーク`,sub:'学年管理者'}];
@@ -296,28 +297,49 @@ async function chat(m){
     </aside>
     <section class="glass chat-main-panel">
       <div id="chatbox" class="chat chat-main-box">${chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom)}</div>
-      ${(chatRoom==='friend'&&chatTarget)||['class','classadmin','gradeadmin'].includes(chatRoom)?`<form class="row chat-send-form" onsubmit="sendCurrentChat(event)"><input class="input" name="text" placeholder="メッセージ"><button class="btn">送信</button></form>`:''}
+      ${(chatRoom==='friend'&&chatTarget)||['class','classadmin','gradeadmin'].includes(chatRoom)?`<div id="replyPreview" class="chat-reply-preview hidden"></div><div id="stickerPanel" class="sticker-panel hidden"><button type="button" onclick="pickSticker("😀")">😀</button><button type="button" onclick="pickSticker("😂")">😂</button><button type="button" onclick="pickSticker("😊")">😊</button><button type="button" onclick="pickSticker("😎")">😎</button><button type="button" onclick="pickSticker("😭")">😭</button><button type="button" onclick="pickSticker("👍")">👍</button><button type="button" onclick="pickSticker("👏")">👏</button><button type="button" onclick="pickSticker("🙏")">🙏</button><button type="button" onclick="pickSticker("❤️")">❤️</button><button type="button" onclick="pickSticker("✨")">✨</button><button type="button" onclick="pickSticker("🔥")">🔥</button><button type="button" onclick="pickSticker("🎉")">🎉</button><button type="button" onclick="pickSticker("💯")">💯</button><button type="button" onclick="pickSticker("🙌")">🙌</button><button type="button" onclick="pickSticker("😴")">😴</button><button type="button" onclick="pickSticker("🤔")">🤔</button><button type="button" onclick="pickSticker("‼️")">‼️</button><button type="button" onclick="pickSticker("⁉️")">⁉️</button><button type="button" onclick="pickSticker("🥹")">🥹</button><button type="button" onclick="pickSticker("😳")">😳</button></div><form class="chat-compose" onsubmit="sendCurrentChat(event)"><label class="chat-tool" title="画像">＋<input type="file" accept="image/*" hidden onchange="sendImageFile(event)"></label><button type="button" class="chat-tool" onclick="toggleSticker()" title="スタンプ">☺</button><input id="chatText" class="input chat-input-large" name="text" placeholder="メッセージを入力" autocomplete="off"><button class="chat-send" type="submit">送信</button></form>`:''}
     </section>
   </div>`;
 }
 async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
 async function groupChatHtml(room){
   const data=room==='class'?await api('/api/class'):await api('/api/talks/'+encodeURIComponent(room));
-  return (data.messages||[]).map(x=>`<div class="bubble ${x.from===me.id?'mine':''}"><div class="sub">${x.from===me.id?'あなた':esc(x.fromName||'メンバー')}</div><div class="bubble-text">${esc(x.text)}</div><div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
+  return (data.messages||[]).map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
 }
 async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
-async function sendCurrentChat(e){
-  e.preventDefault();
-  const f=new FormData(e.target),text=String(f.get('text')||'').trim();
-  if(!text)return;
+function messageBubble(x){
+  const reply=x.replyTo?'<div class="message-reply"><span>返信</span>'+esc(x.replyTo.text||'メッセージ')+'</div>':'';
+  const image=x.image?'<img class="chat-image" src="'+esc(x.image)+'" onclick="openImage('+JSON.stringify(x.image)+')">':'';
+  const sticker=x.sticker?'<div class="chat-sticker">'+esc(x.sticker)+'</div>':'';
+  const text=x.text?'<div class="bubble-text">'+esc(x.text)+'</div>':'';
+  return '<div class="bubble-row '+(x.from===me.id?'mine':'')+'"><div class="bubble '+(x.from===me.id?'mine':'')+'"><div class="message-meta"><b>'+(x.from===me.id?'あなた':esc(x.fromName||'メンバー'))+'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span></div>'+reply+image+sticker+text+'<div class="message-actions"><button type="button" onclick="replyMessage('+JSON.stringify(JSON.stringify({id:x.id,text:x.text||x.sticker||'画像'}))+')">↩ 返信</button></div></div></div>';
+}
+function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
+function toggleSticker(){const p=$('#stickerPanel');if(p)p.classList.toggle('hidden')}
+function pickSticker(s){toggleSticker();sendCurrentChat(null,{sticker:s})}
+function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
+function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if((x.type==='message'||x.type==='group_message')&&view==='chat')chat($('#main'));if(x.type==='call_signal')handleCallSignal(x)}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}
+function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
+let novaPeer=null,novaStream=null,novaTarget=null;
+async function startCall(mode){if(chatRoom!=='friend'||!chatTarget)return toast('個人トークで通話できます');try{novaTarget=chatTarget;novaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:mode==='video'});novaPeer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});novaStream.getTracks().forEach(t=>novaPeer.addTrack(t,novaStream));novaPeer.onicecandidate=e=>e.candidate&&sendSignal({type:'call_signal',action:'ice',toUserId:novaTarget,candidate:e.candidate});novaPeer.ontrack=e=>showCall(mode,e.streams[0]);const offer=await novaPeer.createOffer();await novaPeer.setLocalDescription(offer);sendSignal({type:'call_signal',action:'offer',toUserId:novaTarget,mode,offer});showCall(mode,novaStream)}catch{endCall();toast('通話を開始できませんでした')}}
+function showCall(mode,stream){let b=$('#callWindow');if(!b){b=document.createElement('div');b.id='callWindow';b.className='call-window glass';document.body.append(b)}b.innerHTML='<div class="call-head"><b>'+(mode==='video'?'ビデオ通話':'音声通話')+'</b><button onclick="endCall()">×</button></div><div class="call-stage">'+(mode==='video'?'<video id="remoteVideo" autoplay playsinline></video>':'<div class="call-avatar">☎</div>')+'<video id="localVideo" autoplay muted playsinline></video></div><div class="call-controls"><button onclick="endCall()">終了</button></div>';if(mode==='video'&&stream&&$('#localVideo'))$('#localVideo').srcObject=stream}
+function handleCallSignal(x){if(x.action==='offer'){if(novaPeer)return;if(!confirm('着信があります。通話に出ますか？')){sendSignal({type:'call_signal',action:'reject',toUserId:x.fromUserId});return}navigator.mediaDevices.getUserMedia({audio:true,video:x.mode==='video'}).then(async s=>{novaTarget=x.fromUserId;novaStream=s;novaPeer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});s.getTracks().forEach(t=>novaPeer.addTrack(t,s));novaPeer.onicecandidate=e=>e.candidate&&sendSignal({type:'call_signal',action:'ice',toUserId:x.fromUserId,candidate:e.candidate});novaPeer.ontrack=e=>showCall(x.mode,e.streams[0]);await novaPeer.setRemoteDescription(x.offer);const ans=await novaPeer.createAnswer();await novaPeer.setLocalDescription(ans);sendSignal({type:'call_signal',action:'answer',toUserId:x.fromUserId,answer:ans});showCall(x.mode,s)}).catch(()=>endCall())}else if(x.action==='answer'&&novaPeer)novaPeer.setRemoteDescription(x.answer);else if(x.action==='ice'&&novaPeer)novaPeer.addIceCandidate(x.candidate).catch(()=>{});else if(x.action==='reject')toast('相手が応答しませんでした');else if(x.action==='hangup')endCall()}
+function endCall(){if(novaTarget)sendSignal({type:'call_signal',action:'hangup',toUserId:novaTarget});novaPeer?.close();novaPeer=null;novaStream?.getTracks().forEach(t=>t.stop());novaStream=null;novaTarget=null;$('#callWindow')?.remove()}
+async function sendCurrentChat(e,extra={}){
+  if(e)e.preventDefault();
+  const text=String($('#chatText')?.value||e?.target?.text?.value||'').trim();
+  if(!text&&!extra.image&&!extra.sticker)return;
+  const body={text,...extra,replyTo:window.novaReply||null};
   try{
-    if(chatRoom==='friend')await api('/api/chats/'+encodeURIComponent(chatTarget),{method:'POST',body:JSON.stringify({text})});
-    else if(chatRoom==='class')await api('/api/class/messages',{method:'POST',body:JSON.stringify({text})});
-    else await api('/api/talks/'+encodeURIComponent(chatRoom)+'/messages',{method:'POST',body:JSON.stringify({text})});
-    e.target.reset();await chat($('#main'));
+    if(chatRoom==='friend')await api('/api/chats/'+encodeURIComponent(chatTarget),{method:'POST',body:JSON.stringify(body)});
+    else if(chatRoom==='class')await api('/api/class/messages',{method:'POST',body:JSON.stringify(body)});
+    else await api('/api/talks/'+encodeURIComponent(chatRoom)+'/messages',{method:'POST',body:JSON.stringify(body)});
+    if($('#chatText'))$('#chatText').value='';
+    window.novaReply=null;
+    await chat($('#main'));
   }catch(x){toast(x.message)}
 }
-async function chatHtml(id2){const ms=await api('/api/chats/'+id2);return ms.map(x=>`<div class="bubble ${x.from===me.id?'mine':''}">${esc(x.text)}<div class="sub">${new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')||'<p class="sub">まだメッセージはありません。</p>'}
+async function chatHtml(id2){const ms=await api('/api/chats/'+id2);return ms.map(x=>messageBubble(x)).join('')||'<p class="sub">まだメッセージはありません。</p>'}
 async function school(m){
   const [cls,events,tasks,schedule,elections]=await Promise.all([api('/api/class'),api('/api/events'),api('/api/tasks'),api('/api/schedule'),api('/api/elections')]);
   const posts=await api('/api/posts?kind=class');
