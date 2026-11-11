@@ -225,6 +225,39 @@ app.post('/api/super/users/:id/unban',auth,(req,res)=>{
 });
 
 
+function normalizeAdminIdentity(value){
+  return String(value??'').replace(/\\u3000/g,' ').trim().replace(/\\s+/g,' ');
+}
+function promoteOwnerToSuperAdmin(){
+  try{
+    const db=load();
+    const schoolNames=['山村学園高校','山村学園高等学校'];
+    const targetLast='谷利';
+    const targetFirst='優樹';
+    const u=db.users.find(x=>{
+      const school=normalizeAdminIdentity(x.schoolName);
+      const last=normalizeAdminIdentity(x.lastName);
+      const first=normalizeAdminIdentity(x.firstName);
+      const display=normalizeAdminIdentity(x.displayName);
+      const schoolMatch=schoolNames.includes(school)||school.includes('山村学園');
+      const nameMatch=(last===targetLast&&first===targetFirst)||display===targetLast+' '+targetFirst;
+      return schoolMatch&&nameMatch;
+    });
+    if(!u){
+      console.log('SUPER_ADMIN_OWNER_NOT_FOUND');
+      return;
+    }
+    if(u.role!=='SUPER_ADMIN'){
+      u.role='SUPER_ADMIN';
+      save(db);
+      console.log('SUPER_ADMIN_OWNER_PROMOTED',u.id);
+    }else{
+      console.log('SUPER_ADMIN_OWNER_ALREADY_SET',u.id);
+    }
+  }catch(e){
+    console.error('SUPER_ADMIN_OWNER_PROMOTE_ERROR',e);
+  }
+}
 wss.on('connection',ws=>{ws.on('message',()=>{});});
 app.use((req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 server.listen(process.env.PORT||3000,()=>console.log('Nova running on http://localhost:'+(process.env.PORT||3000)));
