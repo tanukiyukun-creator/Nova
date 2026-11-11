@@ -108,29 +108,34 @@ app.post('/api/register',(req,res)=>{
 function normalizeLoginText(value){
   return String(value??'').replace(/\u3000/g,' ').trim().replace(/\s+/g,' ');
 }
+function safeVerify(password,passwordHash){
+  try{
+    if(!passwordHash||typeof passwordHash!=='string'||!passwordHash.includes(':'))return false;
+    return verify(String(password??''),passwordHash);
+  }catch{return false}
+}
 app.post('/api/login',(req,res)=>{
-  const db=load();
-  const schoolName=normalizeLoginText(req.body.schoolName);
-  const lastName=normalizeLoginText(req.body.lastName);
-  const firstName=normalizeLoginText(req.body.firstName);
-  const displayName=normalizeLoginText(req.body.displayName);
-  const inputDisplayName=normalizeLoginText([lastName,firstName].filter(Boolean).join(' '));
-  const u=db.users.find(x=>{
-    if(normalizeLoginText(x.schoolName)!==schoolName)return false;
-    const xLast=normalizeLoginText(x.lastName);
-    const xFirst=normalizeLoginText(x.firstName);
-    const xDisplay=normalizeLoginText(x.displayName);
-    return (xLast===lastName&&xFirst===firstName)
-      || (inputDisplayName && xDisplay===inputDisplayName)
-      || (displayName && xDisplay===displayName);
-  });
-  if(!u)return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
-  if(u.banned)return res.status(401).json({error:'このアカウントは利用停止中です'});
-  if(!u.passwordHash)return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
-  let passwordOk=false;
-  try{passwordOk=verify(String(req.body.password||''),u.passwordHash)}catch{}
-  if(!passwordOk)return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
-  res.json({token:token(u),user:pub(u)});
+  try{
+    const db=load();
+    const schoolName=normalizeLoginText(req.body.schoolName);
+    const lastName=normalizeLoginText(req.body.lastName);
+    const firstName=normalizeLoginText(req.body.firstName);
+    const inputDisplayName=normalizeLoginText([lastName,firstName].filter(Boolean).join(' '));
+    if(!schoolName||!lastName||!firstName||!String(req.body.password||''))return res.status(400).json({error:'学校名・姓・名・パスワードを入力してください'});
+    const u=db.users.find(x=>{
+      if(normalizeLoginText(x.schoolName)!==schoolName)return false;
+      const xLast=normalizeLoginText(x.lastName);
+      const xFirst=normalizeLoginText(x.firstName);
+      const xDisplay=normalizeLoginText(x.displayName);
+      return (xLast===lastName&&xFirst===firstName)||xDisplay===inputDisplayName;
+    });
+    if(!u)return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
+    if(u.banned)return res.status(401).json({error:'このアカウントは利用停止中です'});
+    if(!safeVerify(req.body.password,u.passwordHash))return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
+    res.json({token:token(u),user:pub(u)});
+  }catch(e){
+    res.status(500).json({error:'ログイン処理に失敗しました'});
+  }
 });
 app.post('/api/super/login',(req,res)=>{const password=String(req.body.password||''); const expectedPassword=process.env.NOVA_SUPER_PASSWORD||'change-this-before-production'; if(!password||password!==expectedPassword)return res.status(401).json({error:'管理パスワードが正しくありません'}); const db=load(); let u=db.users.find(x=>x.id==='nova-super-admin'); if(!u){u={id:'nova-super-admin',schoolId:'nova-system',schoolName:'Nova System',grade:'0',className:'SYSTEM',attendanceNo:'',lastName:'Nova',firstName:'Super Admin',displayName:'Nova Super Admin',icon:'',passwordHash:hash(password),role:'SUPER_ADMIN',createdAt:Date.now(),settings:{notifications:true,callSound:true}};db.users.push(u)}else{u.role='SUPER_ADMIN';u.schoolId='nova-system';u.schoolName='Nova System';u.grade='0';u.className='SYSTEM';u.lastName='Nova';u.firstName='Super Admin';u.displayName='Nova Super Admin';u.passwordHash=hash(password);u.banned=false} save(db); res.json({token:token(u),user:pub(u)})});
 app.get('/api/me',auth,(req,res)=>res.json(pub(req.user)));
