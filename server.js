@@ -71,7 +71,40 @@ app.get('/api/schools',async(req,res)=>{
     return res.json([]);
   }
 });
-app.post('/api/register',(req,res)=>{try{const db=load();const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon}=req.body;const displayName=[lastName,firstName].filter(Boolean).join(' ').trim();if(!schoolName||!schoolId||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});if(!['1','2','3'].includes(String(grade)))return res.status(400).json({error:'学年は1〜3から選択してください'});if(!/^\d+$/.test(String(attendanceNo))||Number(attendanceNo)<1)return res.status(400).json({error:'出席番号は1以上の数字で入力してください'});if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});if(!/^[^<>]{1,40}$/.test(lastName)||!/^[^<>]{1,40}$/.test(firstName))return res.status(400).json({error:'氏名を正しく入力してください'});if(icon&&icon.length>6*1024*1024)return res.status(400).json({error:'写真のサイズが大きすぎます'});let school=db.schools.find(x=>x.masterId===schoolId||x.id===schoolId||x.name===schoolName);if(!school){school={id:id(),masterId:String(schoolId),name:schoolName,grades:[]};db.schools.push(school)}const exists=db.users.find(u=>u.schoolId===school.id&&u.grade===String(grade)&&u.className===className&&String(u.attendanceNo)===String(attendanceNo));if(exists)return res.status(409).json({error:'この学校・学年・クラス・出席番号はすでに登録されています'});const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:String(className).trim(),attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true}};db.users.push(u);\n    if(!Array.isArray(db.classTalks))db.classTalks=[];\n    let talk=db.classTalks.find(x=>x.schoolId===school.id&&x.grade===String(grade)&&x.className===String(className).trim());\n    if(!talk){talk={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:String(className).trim(),name:`${String(grade)}年${String(className).trim()}組 クラストーク`,createdAt:Date.now(),memberIds:[]};db.classTalks.push(talk)}\n    if(!talk.memberIds.includes(u.id))talk.memberIds.push(u.id);\n    save(db);res.json({token:token(u),user:pub(u)})}catch(e){res.status(500).json({error:'登録処理に失敗しました'})}});
+app.post('/api/register',(req,res)=>{
+  try{
+    const db=load();
+    const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon}=req.body;
+    const displayName=[lastName,firstName].filter(Boolean).join(' ').trim();
+    if(!schoolName||!schoolId||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});
+    if(!['1','2','3'].includes(String(grade)))return res.status(400).json({error:'学年は1〜3から選択してください'});
+    if(!/^\d+$/.test(String(attendanceNo))||Number(attendanceNo)<1)return res.status(400).json({error:'出席番号は1以上の数字で入力してください'});
+    if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});
+    if(!/^[^<>]{1,40}$/.test(lastName)||!/^[^<>]{1,40}$/.test(firstName))return res.status(400).json({error:'氏名を正しく入力してください'});
+    if(icon&&icon.length>6*1024*1024)return res.status(400).json({error:'写真のサイズが大きすぎます'});
+    let school=db.schools.find(x=>x.masterId===schoolId||x.id===schoolId||x.name===schoolName);
+    if(!school){
+      school={id:id(),masterId:String(schoolId),name:schoolName,grades:[]};
+      db.schools.push(school);
+    }
+    const normalizedClass=String(className).trim();
+    const exists=db.users.find(u=>u.schoolId===school.id&&u.grade===String(grade)&&u.className===normalizedClass&&String(u.attendanceNo)===String(attendanceNo));
+    if(exists)return res.status(409).json({error:'この学校・学年・クラス・出席番号はすでに登録されています'});
+    const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:normalizedClass,attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true}};
+    db.users.push(u);
+    if(!Array.isArray(db.classTalks))db.classTalks=[];
+    let talk=db.classTalks.find(x=>x.schoolId===school.id&&x.grade===String(grade)&&x.className===normalizedClass);
+    if(!talk){
+      talk={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:normalizedClass,name:String(grade)+'年'+normalizedClass+'組 クラストーク',createdAt:Date.now(),memberIds:[]};
+      db.classTalks.push(talk);
+    }
+    if(!talk.memberIds.includes(u.id))talk.memberIds.push(u.id);
+    save(db);
+    res.json({token:token(u),user:pub(u)});
+  }catch(e){
+    res.status(500).json({error:'登録処理に失敗しました'});
+  }
+});
 app.post('/api/login',(req,res)=>{
   const db=load();
   const schoolName=String(req.body.schoolName||'').trim();
