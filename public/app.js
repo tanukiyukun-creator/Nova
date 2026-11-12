@@ -283,7 +283,7 @@ let chatRoom='class';
 let chatTarget=null;
 async async function chat(m){
   wsConnect();
-  const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
+  const rooms=[{id:'school',title:'学校',sub:'学校全体',icon:'S'},{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(hasClientRole('CLASS_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
   if(hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'gradeadmin',title:me.grade+'年 GRADE ADMIN',sub:'学年管理者',icon:'G'});
   if(!friends.length)friends=await api('/api/friends');
@@ -334,7 +334,7 @@ function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.nova
 let novaPeers={},novaStream=null,novaTargets=[],novaMode=null,novaRoomKey=null,novaCallId=null;
 function callScope(){
   if(chatRoom==='friend')return {scope:'friend',ids:chatTarget?[chatTarget]:[]};
-  if(chatRoom==='class'||chatRoom==='classadmin'||chatRoom==='gradeadmin')return {scope:chatRoom,ids:[]};
+  if(chatRoom==='school'||chatRoom==='class'||chatRoom==='classadmin'||chatRoom==='gradeadmin')return {scope:chatRoom,ids:[]};
   if(chatRoom.startsWith('group:'))return {scope:'group',groupId:chatRoom.slice(6),ids:[]};
   return null;
 }
