@@ -594,7 +594,7 @@ function finishStudy(){
 }
 function startRetryStudy(){const s=window.studySession;if(!s?.wrong.length)return toast('間違えた問題はありません');s.pool=[...s.wrong];s.i=0;s.correct=0;s.wrong=[];runStudyQuestion()}
 function finishStudyFlash(){const s=window.flashStudy;$('#main').innerHTML=`<section class="glass card study-result"><div class="eyebrow">FLASHCARD COMPLETE</div><h2>フラッシュカード終了</h2><p>${s.pool.length}語を確認しました。</p><button class="btn primary-btn" onclick="study($('#main'))">もう一度設定</button></section>`}
-async async function scheduleView(m){
+async function scheduleView(m){
   let schedule=[];
   try{schedule=await api('/api/schedule')}catch(e){return m.innerHTML='<div class="glass card"><h2>時間割を読み込めませんでした</h2><p class="sub">'+esc(e.message)+'</p></div>'}
   const days=['月','火','水','木','金'];
