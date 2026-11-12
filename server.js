@@ -130,6 +130,7 @@ function safeVerify(password,passwordHash){
     return verify(String(password??''),passwordHash);
   }catch{return false}
 }
+function cleanupAdminTalkMembership(u,db){if(!Array.isArray(db.talks))return;for(const t of db.talks){if(t.room==='classadmin'&&!['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN'].includes(u.role))t.memberIds=(t.memberIds||[]).filter(x=>x!==u.id);if(t.room==='gradeadmin'&&!['GRADE_ADMIN','SCHOOL_ADMIN'].includes(u.role))t.memberIds=(t.memberIds||[]).filter(x=>x!==u.id)}}
 function ensureSuperAdminOwner(u,db){
   if(!u)return false;
   const school=normalizeAdminIdentity(u.schoolName);
@@ -137,8 +138,8 @@ function ensureSuperAdminOwner(u,db){
   const first=normalizeAdminIdentity(u.firstName);
   const display=normalizeAdminIdentity(u.displayName);
   const isOwner=(school.includes('山村学園')&&((last==='谷利'&&first==='優樹')||display==='谷利 優樹'));
-  if(isOwner&&u.role!=='SUPER_ADMIN'){u.role='SUPER_ADMIN';save(db);console.log('SUPER_ADMIN_OWNER_PROMOTED_ON_AUTH',u.id);return true}
-  return isOwner;
+  if(isOwner&&u.role!=='SUPER_ADMIN'){u.role='SUPER_ADMIN';console.log('SUPER_ADMIN_OWNER_PROMOTED_ON_AUTH',u.id)}
+  cleanupAdminTalkMembership(u,db);save(db);return isOwner;
 }
 app.post('/api/login',(req,res)=>{
   try{
