@@ -612,7 +612,7 @@ function finishStudy(){
 }
 function startRetryStudy(){const s=window.studySession;if(!s?.wrong.length)return toast('間違えた問題はありません');s.pool=[...s.wrong];s.i=0;s.correct=0;s.wrong=[];runStudyQuestion()}
 function finishStudyFlash(){const s=window.flashStudy;$('#main').innerHTML=`<section class="glass card study-result"><div class="eyebrow">FLASHCARD COMPLETE</div><h2>フラッシュカード終了</h2><p>${s.pool.length}語を確認しました。</p><button class="btn primary-btn" onclick="study($('#main'))">もう一度設定</button></section>`}
-async async function scheduleView(m){
+async function scheduleView(m){
   const canManage=hasClientRole('SUPER_ADMIN')||hasClientRole('SCHOOL_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('CLASS_ADMIN');
   const canSchool=hasClientRole('SUPER_ADMIN')||hasClientRole('SCHOOL_ADMIN');
   try{
