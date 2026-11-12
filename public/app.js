@@ -45,12 +45,12 @@ async function superBan(id){
   try{await api('/api/super/users/'+id+'/ban',{method:'POST',body:JSON.stringify({reason})});toast('アカウントをBANしました');return renderSuperAdmin()}catch(x){toast(x.message)}
 }
 async function superRolePrompt(id){
-  const state=window.NOVA_SUPER_STATE||{};const u=(state.users||[]).find(x=>x.id===id);if(!u)return;
-  const current=[u.role||'STUDENT',...(Array.isArray(u.adminRoles)?u.adminRoles:[])].filter((v,i,a)=>a.indexOf(v)===i);
-  const raw=prompt('設定する権限をカンマ区切りで入力してください。\\nSTUDENT / CLASS_ADMIN / GRADE_ADMIN / SCHOOL_ADMIN / SUPER_ADMIN\\n\\n権限を剥奪する場合は、残したい権限だけ入力してください。\\n現在: '+current.join(', '),current.join(', '));
-  if(raw===null)return;
-  const roles=raw.split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
-  try{await api('/api/super/users/'+encodeURIComponent(id)+'/roles',{method:'POST',body:JSON.stringify({roles})});toast('権限を更新しました');return renderSuperAdmin()}catch(x){toast(x.message)}
+  const state=window.NOVA_SUPER_STATE||{}; const u=(state.users||[]).find(x=>x.id===id); if(!u)return;
+  const current=[...(u.adminRoles||[]),u.role||'STUDENT']; const roles=['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'];
+  const overlay=document.createElement('div'); overlay.className='nova-role-modal';
+  overlay.innerHTML='<div class="nova-role-modal-bg"></div><div class="nova-role-modal-card glass"><div class="eyebrow">PERMISSION CONTROL</div><h3>権限を変更</h3><p>'+esc(u.displayName)+' の権限を選択してください。</p><div class="nova-role-options">'+roles.map(r=>'<label><input type="checkbox" value="'+r+'" '+(current.includes(r)?'checked':'')+'><span>'+r+'</span></label>').join('')+'</div><div class="nova-role-actions"><button class="btn alt" id="roleCancel">キャンセル</button><button class="btn primary-btn" id="roleSave">保存</button></div></div>';
+  document.body.append(overlay); const close=()=>overlay.remove(); overlay.querySelector('.nova-role-modal-bg').onclick=close; overlay.querySelector('#roleCancel').onclick=close;
+  overlay.querySelector('#roleSave').onclick=async()=>{const selected=[...overlay.querySelectorAll('input:checked')].map(x=>x.value); if(u.id===me?.id&&!selected.includes('SUPER_ADMIN'))return toast('自分のSUPER ADMIN権限は剥奪できません'); try{await api('/api/super/users/'+encodeURIComponent(id)+'/roles',{method:'POST',body:JSON.stringify({roles:selected})});close();toast('権限を更新しました');await renderSuperAdmin()}catch(x){toast(x.message)}};
 }
 async function superUnban(id){
   if(!confirm('このアカウントのBANを解除しますか？'))return;
@@ -240,7 +240,7 @@ function homeNotificationItems(notes){
   return notes.filter(n=>!n.read);
 }
 async function home(m){
-  const [tasks,notes,schedule,changes]=await Promise.all([api('/api/tasks'),api('/api/notifications'),api('/api/schedule'),api('/api/schedule/changes')]);
+  const [tasks,notes,schedule,changes]=await Promise.all([api('/api/tasks').catch(()=>[]),api('/api/notifications').catch(()=>[]),api('/api/schedule').catch(()=>[]),api('/api/schedule/changes').catch(()=>[])]);
   const now=new Date();
   const selected=new Date(homeSelectedDate);
   const isToday=selected.toDateString()===now.toDateString();
@@ -249,7 +249,7 @@ async function home(m){
   const unfinished=tasks.filter(t=>!t.completed).slice(0,4);
   const unreadChats=homeNotificationItems(notes).filter(n=>['message','class_message','group_message','reply'].includes(n.type)).slice(0,4);
   const notices=homeNotificationItems(notes).filter(n=>!['message','class_message','group_message','reply'].includes(n.type)).slice(0,4);
-  const dateKey=selected.toISOString().slice(0,10);
+  const dateKey=selected.getFullYear()+'-'+String(selected.getMonth()+1).padStart(2,'0')+'-'+String(selected.getDate()).padStart(2,'0');
   const daySchedule=[];
   for(const x of schedule){
     const ch=(changes||[]).find(c=>c.date===dateKey&&c.scheduleId===x.id);
@@ -281,7 +281,7 @@ async function home(m){
     </section>
     <div class="home-two-col">
       <section class="home-card glass">
-        <div class="compact-card-head"><div><span class="card-icon">□</span><div><b>終わってない課題</b><small>${unfinished.length}件</small></div></div><button class="mini-link" onclick="go('school')">一覧 ›</button></div>
+        <div class="compact-card-head"><div><span class="card-icon">□</span><div><b>終わってない課題</b><small>${unfinished.length}件</small></div></div><button class="mini-link" onclick="go('schedule')">一覧 ›</button></div>
         <div class="home-list">${taskHtml}</div>
       </section>
       <section class="home-card glass">
@@ -615,14 +615,14 @@ async function openStudySetup(id2,name,pth){
       <div class="study-setup-head"><div><div class="eyebrow">STUDY SETTINGS</div><h2>${esc(name)}</h2></div><button class="btn alt" onclick="study($('#main'))">戻る</button></div>
       <div class="study-book-stats"><div><b>${seenCount}</b><small>出題済み</small></div><div><b>${wrongCount}</b><small>間違い</small></div><div><b>${totalAccuracy}%</b><small>累計正答率</small></div></div>
       <div class="study-form-grid">
-        <label><span>範囲</span><input id="studyRange" class="input" value="1-50" placeholder="例：1-50,101-200" inputmode="text"></label>
+        <label><span>範囲</span><div class="study-range-inputs"><input id="studyRangeFrom" class="input" type="number" min="1" max="${max}" value="1"><span>〜</span><input id="studyRangeTo" class="input" type="number" min="1" max="${max}" value="${Math.min(50,max)}"></div></label>
         <label><span>問題数</span><input id="studyCount" class="input" type="number" min="1" max="${max}" value="20"></label>
         <label><span>出題方向</span><select id="studyDirection" class="input"><option value="en-ja">英語 → 日本語</option><option value="ja-en">日本語 → 英語</option><option value="random">ランダム</option><option value="both">両方向</option></select></label>
         <label><span>順番</span><select id="studyOrder" class="input"><option value="number">番号順</option><option value="random">ランダム</option><option value="wrong">間違えたものを優先</option><option value="unseen">未出題を優先</option></select></label>
         <label><span>問題形式</span><select id="studyMode" class="input"><option value="choice">4択</option><option value="choice-hard">4択（紛らわしい選択肢）</option><option value="input">入力</option><option value="flash">フラッシュカード</option><option value="listening">リスニング</option><option value="dictation">書き取り</option></select></label>
         <label class="study-check"><input id="studySpeak" type="checkbox" checked> 読み上げる</label>
       </div>
-      <div class="study-range-help">全${max}語。複数範囲は「1-50,101-200」のように入力できます。</div>
+      <div class="study-range-help">全${max}語。数字の部分だけ変更できます。</div>
       <button class="btn primary-btn study-start" onclick="startStudy('${esc(id2)}')">この設定で学習開始</button>
     </section>
   </div>`
@@ -703,7 +703,7 @@ function studySpeak(text,lang){
 }
 function startStudy(id2){
   const a=window.NOVA_BOOKS?.[id2]||[];
-  const range=parseStudyRanges($('#studyRange')?.value,a.length);
+  const from=Math.max(1,Number($('#studyRangeFrom')?.value)||1); const to=Math.min(a.length,Number($('#studyRangeTo')?.value)||from); const range=parseStudyRanges(from+'-'+to,a.length);
   if(!range.length)return toast('範囲を正しく入力してください');
   const byNo=new Map(a.map(x=>[Number(x.no),x]));
   let pool=range.map(i=>byNo.get(i+1)).filter(Boolean);
