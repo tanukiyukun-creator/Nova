@@ -277,7 +277,7 @@ app.get('/api/class',auth,(req,res)=>{
   const members=db.users.filter(u=>talk.memberIds.includes(u.id)).map(pub);
   res.json({talk,messages,members});
 });
-app.post('/api/class/messages',auth,(req,res)=>{
+app.post('/api/class/messages',auth,(req,res)=>{try{
   const db=load();
   if(!Array.isArray(db.classTalks))db.classTalks=[];
   let talk=db.classTalks.find(x=>x.schoolId===req.user.schoolId&&x.grade===req.user.grade&&x.className===req.user.className);
@@ -290,6 +290,7 @@ app.post('/api/class/messages',auth,(req,res)=>{
   save(db);
   wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'class_message',message:m,talkId:talk.id}))});
   res.json(m);
+}catch(e){res.status(400).json({error:e.message||'メッセージを送信できません'});}
 });
 app.post('/api/class/read',auth,(req,res)=>{const db=load();const talk=db.classTalks.find(x=>x.schoolId===req.user.schoolId&&x.grade===req.user.grade&&x.className===req.user.className);if(talk)db.messages.filter(m=>m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
 app.post('/api/talks/:room/read',auth,(req,res)=>{const db=load();const talk=ensureTalk(db,req.user,String(req.params.room));db.messages.filter(m=>m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
