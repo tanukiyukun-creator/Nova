@@ -731,8 +731,7 @@ function studyQuestionPair(x,direction,index=0){
 function renderStudyFeedback(ok){
   const s=window.studySession;if(!s||!s.currentPair)return;
   const x=s.pool[s.i],p=s.currentPair;
-  studySaveSeen(s.id,x.no);
-  studySaveStat(s.id,ok);
+  studySaveSeen(s.id,x.no);studySaveStat(s.id,ok);
   if(ok)s.correct++;else{studySaveWrong(s.id,x.no);s.wrong.push(x)}
   s.answered=true;
   $('#main').innerHTML=`<section class="glass card study-question study-feedback">
@@ -750,6 +749,11 @@ function nextStudyQuestion(){
   const s=window.studySession;if(!s||!s.answered)return;
   s.i++;s.currentPair=null;s.answered=false;runStudyQuestion();
 }
+function studyChoiceAnswer(value){
+  const s=window.studySession;if(!s||s.answered||!s.currentPair)return;
+  const ok=String(value)===String(s.currentPair.a);
+  renderStudyFeedback(ok);
+}
 function runStudyQuestion(){
   const s=window.studySession;if(!s||s.i>=s.pool.length)return finishStudy();
   const x=s.pool[s.i],p=studyQuestionPair(x,s.direction,s.i);
@@ -757,17 +761,20 @@ function runStudyQuestion(){
   const others=s.pool.filter(y=>y!==x);
   const sameType=others.filter(y=>y.type===x.type);
   const source=(s.mode==='choice-hard'&&sameType.length>=3)?sameType:others;
-  const distractors=studyShuffle(source.map(y=>studyQuestionPair(y,s.direction,s.i).a).filter(v=>String(v)!==String(p.a))).slice(0,3);
-  const fallback=studyShuffle(others.map(y=>studyQuestionPair(y,s.direction,s.i).a).filter(v=>String(v)!==String(p.a)));
-  const choices=studyShuffle([p.a,...distractors,...fallback]).slice(0,4);
+  let distractors=studyShuffle(source.map(y=>studyQuestionPair(y,s.direction,s.i).a).filter(v=>String(v)!==String(p.a)));
+  if(distractors.length<3)distractors=studyShuffle(others.map(y=>studyQuestionPair(y,s.direction,s.i).a).filter(v=>String(v)!==String(p.a)));
+  const choices=studyShuffle([p.a,...distractors]).filter((v,i,a)=>a.findIndex(z=>String(z)===String(v))===i).slice(0,4);
+  if(!choices.some(v=>String(v)===String(p.a))){
+    choices.pop();choices.unshift(p.a);
+  }
   if(s.mode==='choice'||s.mode==='choice-hard'){
-    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">${p.lang==='en-US'?'ENGLISH':'JAPANESE'}</div><div class="study-prompt">${esc(p.q)}</div><div class="study-actions">${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}</div><div class="study-choices">${choices.map(o=>`<button class="study-choice" onclick="renderStudyFeedback(${JSON.stringify(o)}===${JSON.stringify(p.a)})">${esc(o)}</button>`).join('')}</div></section>`;
+    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">${p.lang==='en-US'?'ENGLISH':'JAPANESE'}</div><div class="study-prompt">${esc(p.q)}</div><div class="study-actions">${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}</div><div class="study-choices">${choices.map(o=>`<button class="study-choice" onclick="studyChoiceAnswer(${JSON.stringify(o)})">${esc(o)}</button>`).join('')}</div></section>`;
     if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
   }else if(s.mode==='input'||s.mode==='dictation'){
-    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">${s.mode==='dictation'?'WRITE':'INPUT'}</div><div class="study-prompt">${esc(p.q)}</div>${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}<input id="studyAnswer" class="input study-answer" autocomplete="off" placeholder="${p.lang==='en-US'?'答えを入力':'英語を入力'}" onkeydown="if(event.key==='Enter')answerStudyInput()"><button class="btn primary-btn" onclick="answerStudyInput()">答え合わせ</button></section>`;
+    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">${s.mode==='dictation'?'WRITE':'INPUT'}</div><div class="study-prompt">${esc(p.q)}</div>${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}<input id="studyAnswer" class="input study-answer" autocomplete="off" placeholder="答えを入力" onkeydown="if(event.key==='Enter')answerStudyInput()"><button class="btn primary-btn" onclick="answerStudyInput()">答え合わせ</button></section>`;
     if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
   }else if(s.mode==='listening'){
-    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">LISTENING</div><button class="study-listen" onclick="studySpeak(${JSON.stringify(p.q)},${JSON.stringify(p.lang)})">▶ 音声を再生</button><div class="study-prompt listening-prompt">音声を聞いて答えを選択</div><div class="study-choices">${choices.map(o=>`<button class="study-choice" onclick="renderStudyFeedback(${JSON.stringify(o)}===${JSON.stringify(p.a)})">${esc(o)}</button>`).join('')}</div></section>`;
+    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><button class="study-listen" onclick="studySpeak(${JSON.stringify(p.q)},${JSON.stringify(p.lang)})">▶ 音声を再生</button><div class="study-prompt listening-prompt">音声を聞いて答えを選択</div><div class="study-choices">${choices.map(o=>`<button class="study-choice" onclick="studyChoiceAnswer(${JSON.stringify(o)})">${esc(o)}</button>`).join('')}</div></section>`;
     if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
   }
 }
