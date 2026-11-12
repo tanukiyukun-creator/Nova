@@ -290,11 +290,12 @@ let chatRoom='class';
 let chatTarget=null;
 async function chat(m){
   wsConnect();
-  const rooms=[{id:'school',title:'学校',sub:'学校全体',icon:'S'},{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
+  const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(hasClientRole('CLASS_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
   if(hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'gradeadmin',title:me.grade+'年 GRADE ADMIN',sub:'学年管理者',icon:'G'});
   if(!friends.length)friends=await api('/api/friends');
   const groups=await api('/api/groups');
+  if(chatRoom==='school')chatRoom='class';
   if(!rooms.some(r=>r.id===chatRoom)&&!chatRoom.startsWith('group:')&&chatRoom!=='friend')chatRoom='class';
   const selectedFriend=chatRoom==='friend'&&chatTarget?friends.find(x=>x.id===chatTarget):null;
   const selectedGroup=chatRoom.startsWith('group:')?groups.find(x=>x.id===chatRoom.slice(6)):null;
