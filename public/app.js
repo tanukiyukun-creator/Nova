@@ -683,57 +683,77 @@ function startStudy(id2){
   pool=pool.slice(0,count);
   const direction=$('#studyDirection').value,mode=$('#studyMode').value,speak=$('#studySpeak').checked;
   if(mode==='flash')return runFlashStudy(id2,pool,direction,speak);
-  window.studySession={id:id2,pool,i:0,correct:0,wrong:[],direction,mode,speak};
+  window.studySession={id:id2,pool,i:0,correct:0,wrong:[],direction,mode,speak,currentPair:null,answered:false};
   runStudyQuestion();
 }
 function studyQuestionPair(x,direction){
   const dir=direction==='random'?(Math.random()<.5?'en-ja':'ja-en'):direction;
-  if(dir==='both')return Math.random()<.5?{q:x.q,a:x.a,lang:'en'}:{q:x.a,a:x.q,lang:'ja-JP'};
+  if(dir==='both')return Math.random()<.5?{q:x.q,a:x.a,lang:'en-US'}:{q:x.a,a:x.q,lang:'ja-JP'};
   return dir==='ja-en'?{q:x.a,a:x.q,lang:'ja-JP'}:{q:x.q,a:x.a,lang:'en-US'};
+}
+function renderStudyFeedback(ok){
+  const s=window.studySession;if(!s||!s.currentPair)return;
+  const x=s.pool[s.i],p=s.currentPair;
+  const seenKey='novaStudySeen_'+s.id,seen=new Set(JSON.parse(localStorage.getItem(seenKey)||'[]'));seen.add(x.no);localStorage.setItem(seenKey,JSON.stringify([...seen]));
+  if(ok)s.correct++;else{studySaveWrong(s.id,x.no);s.wrong.push(x)}
+  s.answered=true;
+  $('#main').innerHTML=`<section class="glass card study-question study-feedback">
+    <div class="study-progress">${s.i+1} / ${s.pool.length}</div>
+    <div class="study-question-type">${ok?'CORRECT':'INCORRECT'}</div>
+    <div class="study-feedback-result ${ok?'correct':'incorrect'}">${ok?'正解！':'不正解'}</div>
+    <div class="study-prompt">${esc(p.q)}</div>
+    <div class="study-answer-label">正解</div>
+    <div class="study-correct-answer">${esc(p.a)}</div>
+    ${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 もう一度読み上げ</button>':''}
+    <button class="btn primary-btn" onclick="nextStudyQuestion()">次の問題</button>
+  </section>`;
+}
+function nextStudyQuestion(){
+  const s=window.studySession;if(!s||!s.answered)return;
+  s.i++;s.currentPair=null;s.answered=false;runStudyQuestion();
 }
 function runStudyQuestion(){
   const s=window.studySession;if(!s||s.i>=s.pool.length)return finishStudy();
   const x=s.pool[s.i],p=studyQuestionPair(x,s.direction);
+  s.currentPair=p;s.answered=false;
   const distractors=studyShuffle(s.pool.filter(y=>y!==x).map(y=>y.a)).slice(0,3);
-  let choices=studyShuffle([x.a,...distractors]);
+  const choices=studyShuffle([p.a,...distractors]);
   if(s.mode==='choice'||s.mode==='choice-hard'){
-    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">${p.lang==='en'?'ENGLISH':'JAPANESE'}</div><div class="study-prompt">${esc(p.q)}</div><div class="study-actions">${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}</div><div class="study-choices">${choices.map(o=>`<button class="study-choice" onclick="answerStudy(${JSON.stringify(o)}===${JSON.stringify(p.a)})">${esc(o)}</button>`).join('')}</div></section>`;
+    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">${p.lang==='en-US'?'ENGLISH':'JAPANESE'}</div><div class="study-prompt">${esc(p.q)}</div><div class="study-actions">${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}</div><div class="study-choices">${choices.map(o=>`<button class="study-choice" onclick="renderStudyFeedback(${JSON.stringify(o)}===${JSON.stringify(p.a)})">${esc(o)}</button>`).join('')}</div></section>`;
+    if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
   }else if(s.mode==='input'||s.mode==='dictation'){
-    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">${s.mode==='dictation'?'WRITE':'INPUT'}</div><div class="study-prompt">${esc(p.q)}</div>${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}<input id="studyAnswer" class="input study-answer" autocomplete="off" placeholder="${p.lang==='en'?'答えを入力':'英語を入力'}" onkeydown="if(event.key==='Enter')answerStudyInput()"><button class="btn primary-btn" onclick="answerStudyInput()">答え合わせ</button></section>`;
-    if(s.mode==='dictation'&&s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
+    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">${s.mode==='dictation'?'WRITE':'INPUT'}</div><div class="study-prompt">${esc(p.q)}</div>${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}<input id="studyAnswer" class="input study-answer" autocomplete="off" placeholder="${p.lang==='en-US'?'答えを入力':'英語を入力'}" onkeydown="if(event.key==='Enter')answerStudyInput()"><button class="btn primary-btn" onclick="answerStudyInput()">答え合わせ</button></section>`;
+    if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
   }else if(s.mode==='listening'){
-    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">LISTENING</div><button class="study-listen" onclick="studySpeak(${JSON.stringify(p.q)},${JSON.stringify(p.lang)})">▶ 音声を再生</button><div class="study-prompt listening-prompt">音声を聞いて答えを選択</div><div class="study-choices">${choices.map(o=>`<button class="study-choice" onclick="answerStudy(${JSON.stringify(o)}===${JSON.stringify(p.a)})">${esc(o)}</button>`).join('')}</div></section>`;if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250)}
-}
-function answerStudy(ok){
-  const s=window.studySession,x=s.pool[s.i];
-  const seenKey='novaStudySeen_'+s.id,seen=new Set(JSON.parse(localStorage.getItem(seenKey)||'[]'));seen.add(x.no);localStorage.setItem(seenKey,JSON.stringify([...seen]));
-  if(ok)s.correct++;else{studySaveWrong(s.id,x.no);s.wrong.push(x)}
-  s.i++;toast(ok?'正解！':'不正解');setTimeout(runStudyQuestion,350);
+    $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">LISTENING</div><button class="study-listen" onclick="studySpeak(${JSON.stringify(p.q)},${JSON.stringify(p.lang)})">▶ 音声を再生</button><div class="study-prompt listening-prompt">音声を聞いて答えを選択</div><div class="study-choices">${choices.map(o=>`<button class="study-choice" onclick="renderStudyFeedback(${JSON.stringify(o)}===${JSON.stringify(p.a)})">${esc(o)}</button>`).join('')}</div></section>`;
+    if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
+  }
 }
 function answerStudyInput(){
-  const s=window.studySession,x=s.pool[s.i],p=studyQuestionPair(x,s.direction);
+  const s=window.studySession;if(!s||s.answered)return;
+  const p=s.currentPair;if(!p)return;
   const raw=String($('#studyAnswer')?.value||'').trim().toLowerCase();
   const target=String(p.a||'').trim().toLowerCase();
   const ok=raw===target||target.split(/[，,、]/)[0].trim().toLowerCase()===raw;
-  answerStudy(ok);
+  renderStudyFeedback(ok);
 }
 function runFlashStudy(id2,pool,direction,speak){
-  window.flashStudy={id:id2,pool,i:0,direction,speak,show:false};
+  window.flashStudy={id:id2,pool,i:0,direction,speak,show:false,currentPair:null};
   renderFlashStudy();
 }
 function renderFlashStudy(){
   const s=window.flashStudy;if(!s||s.i>=s.pool.length)return finishStudyFlash();
-  const x=s.pool[s.i],p=studyQuestionPair(x,s.direction);
-  $('#main').innerHTML=`<section class="glass card study-question flash-study"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-flash-card" onclick="flashStudyReveal()"><span>${s.show?'答え':'問題'}</span><strong>${esc(s.show?p.a:p.q)}</strong><small>${s.show?'タップで次へ':'タップして答えを見る'}</small></div>${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}</section>`;
+  const x=s.pool[s.i],p=studyQuestionPair(x,s.direction);s.currentPair=p;
+  $('#main').innerHTML=`<section class="glass card study-question flash-study"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-flash-card" onclick="flashStudyReveal()"><span>${s.show?'答え':'問題'}</span><strong>${esc(s.show?p.a:p.q)}</strong><small>${s.show?'タップで次へ':'タップして答えを見る'}</small></div>${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 もう一度読み上げ</button>':''}</section>`;
   if(s.speak&&!s.show)setTimeout(()=>studySpeak(p.q,p.lang),250);
 }
-function flashStudyReveal(){const s=window.flashStudy;if(!s)return;if(!s.show){s.show=true;renderFlashStudy()}else{s.i++;renderFlashStudy()}}
+function flashStudyReveal(){const s=window.flashStudy;if(!s)return;if(!s.show){s.show=true;renderFlashStudy()}else{s.i++;s.show=false;renderFlashStudy()}}
 function finishStudy(){
   const s=window.studySession;if(!s)return;
   const acc=Math.round(s.correct/s.pool.length*100);
   $('#main').innerHTML=`<section class="glass card study-result"><div class="eyebrow">STUDY COMPLETE</div><h2>学習終了</h2><div class="study-score"><strong>${s.correct}</strong><span>/ ${s.pool.length}</span></div><p>正答率 ${acc}%</p><div class="study-result-actions"><button class="btn primary-btn" onclick="study($('#main'))">もう一度設定</button><button class="btn alt" onclick="startRetryStudy()">間違えたものをもう一度</button></div><div class="list">${s.wrong.map(x=>`<div class="item"><b>${esc(x.q)}</b><div class="sub">${esc(x.a)}</div></div>`).join('')||'<div class="home-empty">今回の間違いはありません。</div>'}</div></section>`;
 }
-function startRetryStudy(){const s=window.studySession;if(!s?.wrong.length)return toast('間違えた問題はありません');s.pool=[...s.wrong];s.i=0;s.correct=0;s.wrong=[];runStudyQuestion()}
+function startRetryStudy(){const s=window.studySession;if(!s?.wrong.length)return toast('間違えた問題はありません');s.pool=[...s.wrong];s.i=0;s.correct=0;s.wrong=[];s.currentPair=null;s.answered=false;runStudyQuestion()}
 function finishStudyFlash(){const s=window.flashStudy;$('#main').innerHTML=`<section class="glass card study-result"><div class="eyebrow">FLASHCARD COMPLETE</div><h2>フラッシュカード終了</h2><p>${s.pool.length}語を確認しました。</p><button class="btn primary-btn" onclick="study($('#main'))">もう一度設定</button></section>`}
 async function scheduleView(m){
   const canManage=hasClientRole('SUPER_ADMIN')||hasClientRole('SCHOOL_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('CLASS_ADMIN');
