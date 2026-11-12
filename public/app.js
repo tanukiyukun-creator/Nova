@@ -648,6 +648,10 @@ async function editTask(t){const title=prompt('課題名',t.title||'');if(title=
 async function deleteTask(id2){if(!confirm('この課題を削除しますか？'))return;try{await api('/api/tasks/'+id2,{method:'DELETE'});scheduleView($('#main'))}catch(e){toast(e.message)}}
 async function toggleTask(id2){try{await api('/api/tasks/'+id2+'/complete',{method:'POST'});scheduleView($('#main'))}catch(e){toast(e.message)}}
 async function settings(m){
+  let schoolUsers=[];
+  const canSchool=hasClientRole('SCHOOL_ADMIN')||hasClientRole('SUPER_ADMIN');
+  if(canSchool){try{schoolUsers=await api('/api/school/users')}catch{}}
+  const schoolManage=canSchool?'<section class="glass card settings-card"><div class="settings-card-title"><b>学校管理</b><span>生徒情報・クラス移動</span></div><div class="list">'+(schoolUsers.length?schoolUsers.map(u=>'<div class="item" style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b>'+esc(u.displayName)+'</b><div class="sub">'+esc(u.grade)+'年 '+esc(u.className)+'組 / 出席番号 '+esc(u.attendanceNo)+'</div></div><button class="ban-btn" onclick="moveSchoolUserPrompt('+JSON.stringify(u.id)+')">クラス移動</button></div>').join(''):'<div class="home-empty">生徒はいません</div>')+'</div></section>':'';
   m.innerHTML=`<div class="settings-page">
     <div class="settings-header"><div class="eyebrow">ACCOUNT SETTINGS</div><h1>設定</h1><p>Novaのアカウント情報を変更できます。</p></div>
     <form class="settings-form" onsubmit="saveProfile(event)">
@@ -680,8 +684,17 @@ async function settings(m){
       </section>
       <div class="settings-actions"><button class="btn primary-btn" type="submit">変更を保存</button></div>
     </form>
+    ${schoolManage}
   </div>`
 }
+async function moveSchoolUserPrompt(id){
+  const grade=prompt('移動先の学年（1〜3）');if(grade===null)return;
+  if(!['1','2','3'].includes(String(grade)))return toast('学年は1〜3です');
+  const className=prompt('移動先のクラス');if(className===null)return;
+  const attendanceNo=prompt('出席番号（変更しない場合は空欄）');
+  try{await api('/api/school/users/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({grade,className,attendanceNo:attendanceNo||undefined})});toast('所属を変更しました');settings($('#main'))}catch(x){toast(x.message)}
+}
+
 function settingsPhoto(e){
   const f=e.target.files?.[0];if(!f)return;
   if(!f.type.startsWith('image/'))return toast('画像ファイルを選択してください');
