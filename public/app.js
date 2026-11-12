@@ -330,8 +330,13 @@ async function startElectionPrompt(room){
 async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
 async function groupChatHtml(room){
   const data=room==='class'?await api('/api/class'):room.startsWith('group:')?await api('/api/groups/'+encodeURIComponent(room.slice(6))):await api('/api/talks/'+encodeURIComponent(room));
-  return (data.messages||[]).map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
+  let html=(data.messages||[]).map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
+  if(room==='classadmin'||room==='gradeadmin'){
+    try{const elections=await api('/api/elections');const active=elections.filter(e=>e.status==='OPEN'&&e.endsAt>Date.now());if(active.length)html='<div class="election-panel glass">'+active.map(e=>'<div class="election-card"><small>'+esc(e.type==='CLASS_ADMIN'?'CLASS ADMIN選挙':'GRADE ADMIN選挙')+'</small><b>管理者を選出</b><div class="election-options">'+e.candidates.map(c=>'<button '+(e.voted?'disabled':'')+' onclick="voteElection('+JSON.stringify(e.id)+','+JSON.stringify(c.id)+')">'+esc(c.name)+(e.voted?'':'に投票')+'</button>').join('')+'</div><span>'+ (e.voted?'投票済み':'投票受付中') +'</span></div>').join('')+'</div>'+html}catch{}}
+  }
+  return html;
 }
+async function voteElection(electionId,candidateId){try{await api('/api/elections/'+electionId+'/vote',{method:'POST',body:JSON.stringify({candidateId})});toast('投票しました');await render(true)}catch(e){toast(e.message)}}
 async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
 function messageBubble(x){
   const reply=x.replyTo?'<div class="message-reply"><span>返信</span>'+esc(x.replyTo.text||'メッセージ')+'</div>':'';
