@@ -315,13 +315,19 @@ function filterChatList(q){const s=String(q||'').trim().toLowerCase();document.q
   try{const g=await api('/api/groups',{method:'POST',body:JSON.stringify({name:name.trim(),memberIds:ids})});chatRoom='group:'+g.id;chatTarget=null;await render(true);toast('グループを作成しました')}catch(x){toast(x.message)}
 }
 async function startElectionPrompt(room){
-  const type=room==='classadmin'?'CLASS_ADMIN':'GRADE_ADMIN';
-  const canSchool=room==='gradeadmin'&&(hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN')||hasClientRole('SUPER_ADMIN'));
-  if(room==='gradeadmin'&&!canSchool)return toast('学年管理者権限が必要です');
+  let type;
+  if(room==='classadmin')type='CLASS_ADMIN';
+  else if(room==='gradeadmin'){
+    if(!(hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN')||hasClientRole('SUPER_ADMIN')))return toast('学年管理者権限が必要です');
+    const choice=prompt('開始する選挙を入力してください：GRADE_ADMIN / SCHOOL_ADMIN','GRADE_ADMIN');
+    if(!choice)return;
+    type=choice.trim().toUpperCase();
+    if(!['GRADE_ADMIN','SCHOOL_ADMIN'].includes(type))return toast('選挙種別が不正です');
+  }else return;
   let candidates=[];try{candidates=await api('/api/elections/candidates?type='+type)}catch(e){return toast(e.message)}
   if(!candidates.length)return toast('候補者がいません');
   const lines=candidates.map((u,i)=>(i+1)+': '+u.displayName).join('\\n');
-  const raw=prompt((type==='CLASS_ADMIN'?'CLASS ADMIN':'GRADE ADMIN')+'候補者の番号をカンマ区切りで入力してください。\\n\\n'+lines);
+  const raw=prompt((type==='CLASS_ADMIN'?'CLASS ADMIN':type==='GRADE_ADMIN'?'GRADE ADMIN':'SCHOOL ADMIN')+'候補者の番号をカンマ区切りで入力してください。\\n\\n'+lines);
   if(!raw?.trim())return;
   const ids=[...new Set(raw.split(',').map(x=>Number(x.trim())-1).filter(i=>Number.isInteger(i)&&i>=0&&i<candidates.length).map(i=>candidates[i].id))];
   if(!ids.length)return toast('候補者を1人以上選択してください');
