@@ -142,9 +142,9 @@ function ensureAdminTalkMembership(u,db){
     return t;
   };
   const classAllowed=db.users.filter(x=>sameGroup(x,u)&&(hasRole(x,'CLASS_ADMIN')||hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
-  const gradeAllowed=db.users.filter(x=>x.schoolId===u.schoolId&&x.grade===u.grade&&(hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
+  const gradeAllowed=db.users.filter(x=>x.schoolId===u.schoolId&&(hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
   ensure('classadmin',u.grade,u.className,classAllowed);
-  ensure('gradeadmin',u.grade,null,gradeAllowed);
+  ensure('gradeadmin',null,null,gradeAllowed);
 }
 function syncAdminTalks(db){
   for(const u of db.users)ensureAdminTalkMembership(u,db);
@@ -223,9 +223,9 @@ app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifi
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
 function ensureTalk(db,user,room){
   if(!Array.isArray(db.talks))db.talks=[];
-  let talk=db.talks.find(x=>x.room===room&&x.schoolId===user.schoolId&&(room==='gradeadmin'?x.grade===user.grade:true));
+  let talk=db.talks.find(x=>x.room===room&&x.schoolId===user.schoolId&&(room==='gradeadmin'?true:true));
   if(!talk){
-    talk={id:id(),room,schoolId:user.schoolId,grade:room==='gradeadmin'?user.grade:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?`${user.grade}年${user.className}組 クラストーク`:room==='school'?'学校トーク':room==='classadmin'?'CLASS ADMIN トーク':`${user.grade}年 GRADE ADMIN トーク`,memberIds:[],createdAt:Date.now()};
+    talk={id:id(),room,schoolId:user.schoolId,grade:room==='gradeadmin'?null:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?`${user.grade}年${user.className}組 クラストーク`:room==='school'?'学校トーク':room==='classadmin'?'CLASS ADMIN トーク':`${user.grade}年 GRADE ADMIN トーク`,memberIds:[],createdAt:Date.now()};
     db.talks.push(talk);
   }
   if(room==='school')db.users.filter(x=>x.schoolId===user.schoolId).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
@@ -236,7 +236,7 @@ function ensureTalk(db,user,room){
     allowed.forEach(x=>{if(!talk.memberIds.includes(x))talk.memberIds.push(x)});
   }
   if(room==='gradeadmin'){
-    const allowed=db.users.filter(x=>x.schoolId===user.schoolId&&x.grade===user.grade&&(hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
+    const allowed=db.users.filter(x=>x.schoolId===user.schoolId&&(hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
     talk.memberIds=talk.memberIds.filter(x=>allowed.includes(x));
     allowed.forEach(x=>{if(!talk.memberIds.includes(x))talk.memberIds.push(x)});
   }
