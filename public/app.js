@@ -44,7 +44,14 @@ async function superBan(id){
   if(!confirm('このアカウントを利用停止にしますか？'))return;
   try{await api('/api/super/users/'+id+'/ban',{method:'POST',body:JSON.stringify({reason})});toast('アカウントをBANしました');return renderSuperAdmin()}catch(x){toast(x.message)}
 }
-function superRolePrompt(id){const role=prompt('権限を入力: STUDENT / CLASS_ADMIN / GRADE_ADMIN / SCHOOL_ADMIN / SUPER_ADMIN');if(!role)return;superSetRole(id,role.trim().toUpperCase())}
+async function superRolePrompt(id){
+  const state=window.NOVA_SUPER_STATE||{};const u=(state.users||[]).find(x=>x.id===id);if(!u)return;
+  const current=[u.role||'STUDENT',...(Array.isArray(u.adminRoles)?u.adminRoles:[])].filter((v,i,a)=>a.indexOf(v)===i);
+  const raw=prompt('設定する権限をカンマ区切りで入力してください。\\nSTUDENT / CLASS_ADMIN / GRADE_ADMIN / SCHOOL_ADMIN / SUPER_ADMIN\\n\\n権限を剥奪する場合は、残したい権限だけ入力してください。\\n現在: '+current.join(', '),current.join(', '));
+  if(raw===null)return;
+  const roles=raw.split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
+  try{await api('/api/super/users/'+encodeURIComponent(id)+'/roles',{method:'POST',body:JSON.stringify({roles})});toast('権限を更新しました');return renderSuperAdmin()}catch(x){toast(x.message)}
+}
 async function superUnban(id){
   if(!confirm('このアカウントのBANを解除しますか？'))return;
   try{await api('/api/super/users/'+id+'/unban',{method:'POST'});toast('BANを解除しました');return renderSuperAdmin()}catch(x){toast(x.message)}
@@ -244,7 +251,7 @@ async function home(m){
   const notices=homeNotificationItems(notes).filter(n=>!['message','class_message','group_message','reply'].includes(n.type)).slice(0,4);
   const daySchedule=schedule.filter(x=>scheduleMatchesDay(x,selected)).sort((a,b)=>Number(a.period||0)-Number(b.period||0));
   const scheduleHtml=daySchedule.map(x=>`<div class="home-schedule-row"><span class="period">${esc(x.period)}限</span><div><b>${esc(x.subject||'授業')}</b><small>${esc(x.room||'')}</small></div></div>`).join('')||'<div class="home-empty">この日の時間割は未登録です</div>';
-  const taskHtml=unfinished.map(t=>`<button class="home-task-row" onclick="go('school')"><span class="task-dot"></span><div><b>${esc(t.title||'課題')}</b><small>${esc(t.subject||'課題')} · ${homeFormatTaskDate(t)}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未完了の課題はありません</div>';
+  const taskHtml=unfinished.map(t=>`<button class="home-task-row" onclick="go('schedule')"><span class="task-dot"></span><div><b>${esc(t.title||'課題')}</b><small>${esc(t.subject||'課題')} · ${homeFormatTaskDate(t)}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未完了の課題はありません</div>';
   const chatHtml=unreadChats.map(n=>`<button class="home-unread-row" onclick="go('chat')"><span class="unread-dot"></span><div><b>${esc(n.title||'新しいメッセージ')}</b><small>${esc(n.body||'未読のメッセージがあります')}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未読のチャットはありません</div>';
   const noticeHtml=notices.map(n=>`<div class="home-notice-row"><span class="notice-mark">•</span><div><b>${esc(n.title||'お知らせ')}</b><small>${esc(n.body||'')}</small></div></div>`).join('')||'<div class="home-empty">新しいお知らせはありません</div>';
   m.innerHTML=`<div class="nova-home nova-home-compact">
