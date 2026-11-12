@@ -33,7 +33,8 @@ function auth(req,res,next){
     next();
   }catch{res.status(401).json({error:'認証が必要です'})}
 }
-function pub(u){const {passwordHash,...x}=u;return x}
+function pub(u){const {passwordHash,...x}=u; x.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles:[]; return x}
+function hasRole(u,role){return u?.role===role||Array.isArray(u?.adminRoles)&&u.adminRoles.includes(role)}
 function notify(db,userId,type,title,body){db.notifications.unshift({id:id(),userId,type,title,body,read:false,createdAt:Date.now()});}
 function sameGroup(a,b){return a.schoolId===b.schoolId&&a.grade===b.grade&&a.className===b.className}
 
@@ -131,7 +132,7 @@ function safeVerify(password,passwordHash){
     return verify(String(password??''),passwordHash);
   }catch{return false}
 }
-function cleanupAdminTalkMembership(u,db){if(!Array.isArray(db.talks))return;for(const t of db.talks){if(t.room==='classadmin'&&!['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN'].includes(u.role))t.memberIds=(t.memberIds||[]).filter(x=>x!==u.id);if(t.room==='gradeadmin'&&!['GRADE_ADMIN','SCHOOL_ADMIN'].includes(u.role))t.memberIds=(t.memberIds||[]).filter(x=>x!==u.id)}}
+function cleanupAdminTalkMembership(u,db){if(!Array.isArray(db.talks))return;for(const t of db.talks){if(t.room==='classadmin'&&!(hasRole(u,'CLASS_ADMIN')||hasRole(u,'GRADE_ADMIN')||hasRole(u,'SCHOOL_ADMIN')))t.memberIds=(t.memberIds||[]).filter(x=>x!==u.id);if(t.room==='gradeadmin'&&!(hasRole(u,'GRADE_ADMIN')||hasRole(u,'SCHOOL_ADMIN')))t.memberIds=(t.memberIds||[]).filter(x=>x!==u.id)}}
 function ensureSuperAdminOwner(u,db){
   if(!u)return false;
   const school=normalizeAdminIdentity(u.schoolName);
@@ -277,21 +278,21 @@ app.post('/api/class/read',auth,(req,res)=>{const db=load();const talk=db.classT
 app.post('/api/talks/:room/read',auth,(req,res)=>{const db=load();const talk=ensureTalk(db,req.user,String(req.params.room));db.messages.filter(m=>m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
 app.get('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.query.kind||'class';res.json(db.posts.filter(p=>p.kind===kind&&p.schoolId===s.schoolId&&(kind==='school'||p.grade===s.grade)&&(kind!=='class'||p.className===s.className)).slice(0,100))});
 app.post('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.body.kind||'class'; if(!canManage(req.user,kind))return res.status(403).json({error:'権限がありません'});const p={id:id(),...s,kind,title:req.body.title||'',body:req.body.body||'',authorId:req.user.id,createdAt:Date.now()};db.posts.unshift(p);save(db);res.json(p)});
-function canManage(u,kind){if(u.role==='SUPER_ADMIN'||u.role==='SCHOOL_ADMIN')return true;if(kind==='grade')return ['GRADE_ADMIN'].includes(u.role);if(kind==='class')return ['CLASS_ADMIN','GRADE_ADMIN'].includes(u.role);return false}
+function canManage(u,kind){if(hasRole(u,'SUPER_ADMIN')||hasRole(u,'SCHOOL_ADMIN'))return true;if(kind==='grade')return hasRole(u,'GRADE_ADMIN');if(kind==='class')return hasRole(u,'CLASS_ADMIN')||hasRole(u,'GRADE_ADMIN');return false}
 app.get('/api/events',auth,(req,res)=>{const db=load(),s=scope(req);res.json(db.events.filter(e=>e.schoolId===s.schoolId&&(e.grade==null||e.grade===s.grade)).sort((a,b)=>a.date.localeCompare(b.date)))});
 app.post('/api/events',auth,(req,res)=>{if(!['SUPER_ADMIN','SCHOOL_ADMIN'].includes(req.user.role))return res.status(403).end();const db=load(),s=scope(req);const e={id:id(),...s,title:req.body.title,date:req.body.date,place:req.body.place||'',body:req.body.body||''};db.events.push(e);db.users.filter(u=>u.schoolId===s.schoolId&&(e.grade==null||u.grade===e.grade)).forEach(u=>notify(db,u.id,'event','学校行事',e.title));save(db);res.json(e)});
 app.get('/api/tasks',auth,(req,res)=>{const db=load(),s=scope(req);if(!Array.isArray(db.taskCompletions))db.taskCompletions=[];res.json(db.tasks.filter(t=>t.schoolId===s.schoolId&&t.grade===s.grade&&t.className===s.className).sort((a,b)=>(a.dueAt||Infinity)-(b.dueAt||Infinity)).map(t=>({...t,completed:db.taskCompletions.some(x=>x.taskId===t.id&&x.userId===req.user.id)})))});
 app.post('/api/tasks/:id/complete',auth,(req,res)=>{const db=load();if(!Array.isArray(db.taskCompletions))db.taskCompletions=[];const t=db.tasks.find(x=>x.id===req.params.id);if(!t)return res.status(404).json({error:'課題が見つかりません'});if(!sameGroup(t,req.user))return res.status(403).json({error:'この課題を操作できません'});const i=db.taskCompletions.findIndex(x=>x.taskId===t.id&&x.userId===req.user.id);if(i>=0)db.taskCompletions.splice(i,1);else db.taskCompletions.push({id:id(),taskId:t.id,userId:req.user.id,completedAt:Date.now()});save(db);res.json({completed:i<0})});
-app.post('/api/tasks',auth,(req,res)=>{if(!['SUPER_ADMIN','SCHOOL_ADMIN','GRADE_ADMIN','CLASS_ADMIN'].includes(req.user.role))return res.status(403).end();const db=load(),s=scope(req);const t={id:id(),...s,subject:req.body.subject,title:req.body.title,detail:req.body.detail||'',dueAt:req.body.dueAt||null,method:req.body.method||'',createdAt:Date.now()};db.tasks.push(t);db.users.filter(u=>sameGroup(u,req.user)).forEach(u=>notify(db,u.id,'task','課題が追加されました',t.title));save(db);res.json(t)});
+app.post('/api/tasks',auth,(req,res)=>{if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN')))return res.status(403).end();const db=load(),s=scope(req);const t={id:id(),...s,subject:req.body.subject,title:req.body.title,detail:req.body.detail||'',dueAt:req.body.dueAt||null,method:req.body.method||'',createdAt:Date.now()};db.tasks.push(t);db.users.filter(u=>sameGroup(u,req.user)).forEach(u=>notify(db,u.id,'task','課題が追加されました',t.title));save(db);res.json(t)});
 app.get('/api/schedule',auth,(req,res)=>{const db=load(),s=scope(req);res.json(db.schedules.filter(x=>x.schoolId===s.schoolId&&x.grade===s.grade&&x.className===s.className))});
 app.post('/api/schedule',auth,(req,res)=>{if(!['SUPER_ADMIN','SCHOOL_ADMIN','GRADE_ADMIN','CLASS_ADMIN'].includes(req.user.role))return res.status(403).end();const db=load(),s=scope(req);const x={id:id(),...s,day:req.body.day,period:req.body.period,subject:req.body.subject,room:req.body.room||'',note:req.body.note||''};db.schedules.push(x);save(db);res.json(x)});
 app.get('/api/elections',auth,(req,res)=>{const db=load(),s=scope(req); const out=db.elections.filter(e=>e.schoolId===s.schoolId&&(e.grade==null||e.grade===s.grade)&&(e.className==null||e.className===s.className)).map(e=>({...e,candidates:e.candidates.map(c=>({id:c.id,name:(db.users.find(u=>u.id===c.userId)?.displayName)||'不明',votes:c.votes||0}))})); res.json(out);});
 app.post('/api/elections',auth,(req,res)=>{const type=req.body.type;const ok=(type==='CLASS_ADMIN'&&['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(req.user.role))||(type==='GRADE_ADMIN'&&['GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(req.user.role))||(type==='SCHOOL_ADMIN'&&['GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(req.user.role));if(!ok)return res.status(403).json({error:'選挙を開始できません'});const db=load(),s=scope(req);const ids=(req.body.candidateIds||[]).filter(x=>db.users.some(u=>u.id===x));const e={id:id(),type,...s,grade:type==='CLASS_ADMIN'?s.grade:s.grade,className:type==='CLASS_ADMIN'?s.className:null,candidates:ids.map(userId=>({id:id(),userId,votes:0})),voted:[],createdAt:Date.now(),endsAt:Date.now()+86400000,status:'OPEN'};db.elections.push(e);save(db);res.json(e)});
 app.post('/api/elections/:id/vote',auth,(req,res)=>{const db=load(),e=db.elections.find(x=>x.id===req.params.id);if(!e||e.status!=='OPEN'||e.voted.includes(req.user.id)||e.endsAt<Date.now())return res.status(400).json({error:'投票できません'});const c=e.candidates.find(c=>c.id===req.body.candidateId);if(!c)return res.status(400).end();c.votes++;e.voted.push(req.user.id);save(db);res.json({ok:true})});
-app.get('/api/study/books',auth,(req,res)=>res.json([{id:'target1200',name:'ターゲット1200',path:'/data/target1200.txt'},{id:'target1900',name:'ターゲット1900',path:'/data/target1900.txt'},{id:'tekkyoku',name:'鉄壁',path:'/data/鉄壁.txt'},{id:'irohani',name:'いろはにほへと古文単語',path:'/data/irohani.txt'}]));
-app.get('/data/:file', (req,res)=>{const base=path.join(__dirname,'data'); const file=path.basename(req.params.file); const allowed=new Set(['target1200.txt','target1900.txt','鉄壁.txt','irohani.txt']); if(!allowed.has(file))return res.status(404).end(); const p=path.join(base,file); if(!fs.existsSync(p))return res.status(404).json({error:'単語帳データが見つかりません'}); res.sendFile(p)});
+app.get('/api/study/books',auth,(req,res)=>res.json([{id:'target1200',name:'ターゲット1200',path:'/data/target1200.txt'},{id:'target1900',name:'ターゲット1900',path:'/data/target1900.txt'},{id:'tekkyoku',name:'鉄壁',path:'/data/tekkyoku.txt'},{id:'irohani',name:'いろはにほへと古文単語',path:'/data/irohani.txt'}]));
+app.get('/data/:file', (req,res)=>{const base=path.join(__dirname,'data'); const file=path.basename(req.params.file); const allowed=new Set(['target1200.txt','target1900.txt','tekkyoku.txt','irohani.txt']); if(!allowed.has(file))return res.status(404).end(); const p=path.join(base,file); if(!fs.existsSync(p))return res.status(404).json({error:'単語帳データが見つかりません'}); res.sendFile(p)});
 app.get('/api/admins',auth,(req,res)=>{const db=load();res.json(db.users.filter(u=>u.schoolId===req.user.schoolId&&u.role!=='STUDENT').map(pub))});
-app.get('/api/debug/state',auth,(req,res)=>{if(req.user.role!=='SUPER_ADMIN')return res.status(403).end();const db=load();res.json({...db,users:db.users.map(pub)});});
+app.get('/api/debug/state',auth,(req,res)=>{if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).end();const db=load();res.json({...db,users:db.users.map(pub)});});
 app.post('/api/super/users/:id/role',auth,(req,res)=>{
   if(req.user.role!=='SUPER_ADMIN')return res.status(403).json({error:'権限がありません'});
   const allowed=['STUDENT','CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'];
@@ -299,8 +300,8 @@ app.post('/api/super/users/:id/role',auth,(req,res)=>{
   if(!allowed.includes(role))return res.status(400).json({error:'不正な権限です'});
   const db=load(),u=db.users.find(x=>x.id===req.params.id);
   if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});
-  if(u.id===req.user.id&&role!=='SUPER_ADMIN')return res.status(400).json({error:'SUPER ADMIN本人はSUPER ADMINのまま利用してください'});
-  u.role=role;save(db);res.json({ok:true,user:pub(u)});
+  if(u.id===req.user.id){u.role='SUPER_ADMIN';u.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles:[];if(role!=='SUPER_ADMIN'&&!u.adminRoles.includes(role))u.adminRoles.push(role);}else{u.role=role;u.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles:[];}
+  save(db);res.json({ok:true,user:pub(u)});
 });
 app.post('/api/super/users/:id/ban',auth,(req,res)=>{
   if(req.user.role!=='SUPER_ADMIN')return res.status(403).json({error:'権限がありません'});
