@@ -124,19 +124,19 @@ app.post('/api/register',(req,res)=>{
   }
 });
 function normalizeLoginText(value){
-  return String(value??'').replace(/\u3000/g,' ').trim().replace(/\s+/g,' ');
+  return String(value||'').replace(/\u3000/g,' ').trim().replace(/\s+/g,' ');
 }
 function safeVerify(password,passwordHash){
   try{
     if(!passwordHash||typeof passwordHash!=='string'||!passwordHash.includes(':'))return false;
-    return verify(String(password??''),passwordHash);
+    return verify(String(password||''),passwordHash);
   }catch{return false}
 }
 function ensureAdminTalkMembership(u,db){
   if(!Array.isArray(db.talks))db.talks=[];
   const ensure=(room,grade,className,allowed)=>{
     let t=db.talks.find(x=>x.room===room&&x.schoolId===u.schoolId&&(grade==null||x.grade===grade)&&(className==null||x.className===className));
-    if(!t){t={id:id(),room,schoolId:u.schoolId,grade:grade??null,className:className??null,name:room==='classadmin'?'CLASS ADMIN トーク':room==='gradeadmin'?(String(grade)+'年 GRADE ADMIN トーク'):room,memberIds:[],createdAt:Date.now()};db.talks.push(t)}
+    if(!t){t={id:id(),room,schoolId:u.schoolId,grade:grade||null,className:className||null,name:room==='classadmin'?'CLASS ADMIN トーク':room==='gradeadmin'?(String(grade)+'年 GRADE ADMIN トーク'):room,memberIds:[],createdAt:Date.now()};db.talks.push(t)}
     t.memberIds=Array.isArray(t.memberIds)?t.memberIds:[];
     if(allowed){t.memberIds=t.memberIds.filter(x=>allowed.includes(x));allowed.forEach(x=>{if(!t.memberIds.includes(x))t.memberIds.push(x)})}
     return t;
@@ -188,18 +188,18 @@ app.get('/api/me',auth,(req,res)=>{const db=load(),u=db.users.find(x=>x.id===req
 app.patch('/api/me',auth,(req,res)=>{
   try{
     const db=load(),u=db.users.find(x=>x.id===req.user.id);
-    const nextSchool=String(req.body.schoolName??u.schoolName).trim();
-    const nextGrade=String(req.body.grade??u.grade);
-    const nextClass=String(req.body.className??u.className).trim();
-    const nextLast=String(req.body.lastName??u.lastName).trim();
-    const nextFirst=String(req.body.firstName??u.firstName).trim();
+    const nextSchool=String(req.body.schoolName||u.schoolName).trim();
+    const nextGrade=String(req.body.grade||u.grade);
+    const nextClass=String(req.body.className||u.className).trim();
+    const nextLast=String(req.body.lastName||u.lastName).trim();
+    const nextFirst=String(req.body.firstName||u.firstName).trim();
     if(!nextSchool||!['1','2','3'].includes(nextGrade)||!nextClass||!nextLast||!nextFirst)return res.status(400).json({error:'学校・学年・クラス・氏名を正しく入力してください'});
     if(req.body.newPassword){
       if(!req.body.currentPassword||!safeVerify(req.body.currentPassword,u.passwordHash))return res.status(401).json({error:'現在のパスワードが正しくありません'});
       if(String(req.body.newPassword).length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});
       u.passwordHash=hash(String(req.body.newPassword));
     }
-    Object.assign(u,{schoolName:nextSchool,grade:nextGrade,className:nextClass,lastName:nextLast,firstName:nextFirst,displayName:`${nextLast} ${nextFirst}`,icon:req.body.icon??u.icon,settings:{...u.settings,...(req.body.settings||{})}});
+    Object.assign(u,{schoolName:nextSchool,grade:nextGrade,className:nextClass,lastName:nextLast,firstName:nextFirst,displayName:`${nextLast} ${nextFirst}`,icon:req.body.icon||u.icon,settings:{...u.settings,...(req.body.settings||{})}});
     const school=db.schools.find(x=>x.id===u.schoolId||x.name===nextSchool);
     if(school)u.schoolId=school.id;
     else{const ns={id:id(),masterId:null,name:nextSchool,grades:[]};db.schools.push(ns);u.schoolId=ns.id;}
@@ -303,7 +303,7 @@ app.post('/api/tasks/:id/complete',auth,(req,res)=>{const db=load();if(!Array.is
 app.post('/api/tasks',auth,(req,res)=>{if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN')))return res.status(403).end();const db=load(),s=scope(req);const t={id:id(),...s,subject:req.body.subject,title:req.body.title,detail:req.body.detail||'',dueAt:req.body.dueAt||null,method:req.body.method||'',createdAt:Date.now()};db.tasks.push(t);db.users.filter(u=>sameGroup(u,req.user)).forEach(u=>notify(db,u.id,'task','課題が追加されました',t.title));save(db);res.json(t)});
 app.get('/api/schedule',auth,(req,res)=>{const db=load(),s=scope(req);res.json(db.schedules.filter(x=>x.schoolId===s.schoolId&&x.grade===s.grade&&x.className===s.className))});
 app.post('/api/schedule',auth,(req,res)=>{if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN')))return res.status(403).end();const db=load(),s=scope(req);const x={id:id(),...s,day:req.body.day,period:req.body.period,subject:req.body.subject,room:req.body.room||'',note:req.body.note||''};db.schedules.push(x);save(db);res.json(x)});
-app.patch('/api/schedule/:id',auth,(req,res)=>{const db=load(),x=db.schedules.find(x=>x.id===req.params.id);if(!x)return res.status(404).json({error:'時間割が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(x,req.user))return res.status(403).json({error:'権限がありません'});Object.assign(x,{day:String(req.body.day??x.day),period:String(req.body.period??x.period),subject:String(req.body.subject??x.subject),room:String(req.body.room??(x.room||'')),note:String(req.body.note??(x.note||''))});save(db);res.json(x)});\napp.delete('/api/schedule/:id',auth,(req,res)=>{const db=load(),i=db.schedules.findIndex(x=>x.id===req.params.id);if(i<0)return res.status(404).json({error:'時間割が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(db.schedules[i],req.user))return res.status(403).json({error:'権限がありません'});db.schedules.splice(i,1);save(db);res.json({ok:true})});\napp.patch('/api/tasks/:id',auth,(req,res)=>{const db=load(),t=db.tasks.find(x=>x.id===req.params.id);if(!t)return res.status(404).json({error:'課題が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(t,req.user))return res.status(403).json({error:'権限がありません'});Object.assign(t,{subject:String(req.body.subject??t.subject),title:String(req.body.title??t.title),detail:String(req.body.detail??(t.detail||'')),dueAt:req.body.dueAt??t.dueAt,method:String(req.body.method??(t.method||''))});save(db);res.json(t)});\napp.delete('/api/tasks/:id',auth,(req,res)=>{const db=load(),i=db.tasks.findIndex(x=>x.id===req.params.id);if(i<0)return res.status(404).json({error:'課題が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(db.tasks[i],req.user))return res.status(403).json({error:'権限がありません'});db.tasks.splice(i,1);db.taskCompletions=(db.taskCompletions||[]).filter(x=>x.taskId!==req.params.id);save(db);res.json({ok:true})});\napp.post('/api/posts/:id/delete',auth,(req,res)=>{const db=load(),i=db.posts.findIndex(x=>x.id===req.params.id);if(i<0)return res.status(404).json({error:'投稿が見つかりません'});const p=db.posts[i];if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||(p.kind==='grade'&&hasRole(req.user,'GRADE_ADMIN'))||(p.kind==='class'&&(hasRole(req.user,'CLASS_ADMIN')||hasRole(req.user,'GRADE_ADMIN'))))||p.schoolId!==req.user.schoolId)return res.status(403).json({error:'権限がありません'});db.posts.splice(i,1);save(db);res.json({ok:true})});\nfunction electionScope(type,user){if(type==='CLASS_ADMIN')return {schoolId:user.schoolId,grade:user.grade,className:user.className};if(type==='GRADE_ADMIN')return {schoolId:user.schoolId,grade:user.grade,className:null};return {schoolId:user.schoolId,grade:null,className:null}}
+app.patch('/api/schedule/:id',auth,(req,res)=>{const db=load(),x=db.schedules.find(x=>x.id===req.params.id);if(!x)return res.status(404).json({error:'時間割が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(x,req.user))return res.status(403).json({error:'権限がありません'});Object.assign(x,{day:String(req.body.day||x.day),period:String(req.body.period||x.period),subject:String(req.body.subject||x.subject),room:String(req.body.room||(x.room||'')),note:String(req.body.note||(x.note||''))});save(db);res.json(x)});\napp.delete('/api/schedule/:id',auth,(req,res)=>{const db=load(),i=db.schedules.findIndex(x=>x.id===req.params.id);if(i<0)return res.status(404).json({error:'時間割が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(db.schedules[i],req.user))return res.status(403).json({error:'権限がありません'});db.schedules.splice(i,1);save(db);res.json({ok:true})});\napp.patch('/api/tasks/:id',auth,(req,res)=>{const db=load(),t=db.tasks.find(x=>x.id===req.params.id);if(!t)return res.status(404).json({error:'課題が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(t,req.user))return res.status(403).json({error:'権限がありません'});Object.assign(t,{subject:String(req.body.subject||t.subject),title:String(req.body.title||t.title),detail:String(req.body.detail||(t.detail||'')),dueAt:req.body.dueAt||t.dueAt,method:String(req.body.method||(t.method||''))});save(db);res.json(t)});\napp.delete('/api/tasks/:id',auth,(req,res)=>{const db=load(),i=db.tasks.findIndex(x=>x.id===req.params.id);if(i<0)return res.status(404).json({error:'課題が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(db.tasks[i],req.user))return res.status(403).json({error:'権限がありません'});db.tasks.splice(i,1);db.taskCompletions=(db.taskCompletions||[]).filter(x=>x.taskId!==req.params.id);save(db);res.json({ok:true})});\napp.post('/api/posts/:id/delete',auth,(req,res)=>{const db=load(),i=db.posts.findIndex(x=>x.id===req.params.id);if(i<0)return res.status(404).json({error:'投稿が見つかりません'});const p=db.posts[i];if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||(p.kind==='grade'&&hasRole(req.user,'GRADE_ADMIN'))||(p.kind==='class'&&(hasRole(req.user,'CLASS_ADMIN')||hasRole(req.user,'GRADE_ADMIN'))))||p.schoolId!==req.user.schoolId)return res.status(403).json({error:'権限がありません'});db.posts.splice(i,1);save(db);res.json({ok:true})});\nfunction electionScope(type,user){if(type==='CLASS_ADMIN')return {schoolId:user.schoolId,grade:user.grade,className:user.className};if(type==='GRADE_ADMIN')return {schoolId:user.schoolId,grade:user.grade,className:null};return {schoolId:user.schoolId,grade:null,className:null}}
 function electionVoters(db,e){if(e.type==='CLASS_ADMIN')return db.users.filter(u=>sameGroup(u,{schoolId:e.schoolId,grade:e.grade,className:e.className})&&u.role==='STUDENT');if(e.type==='GRADE_ADMIN')return db.users.filter(u=>u.schoolId===e.schoolId&&u.grade===e.grade&&hasRole(u,'CLASS_ADMIN'));return db.users.filter(u=>u.schoolId===e.schoolId&&hasRole(u,'GRADE_ADMIN'))}
 function finalizeElection(db,e){if(!e||e.status!=='OPEN')return false;e.status='CLOSED';e.closedAt=Date.now();const voters=electionVoters(db,e),total=voters.length,ranked=(e.candidates||[]).map(c=>({...c,votes:Number(c.votes||0)})).sort((a,b)=>b.votes-a.votes);if(!ranked.length)return true;const half=total>0&&ranked.some(c=>c.votes*2>=total),max=ranked[0].votes,winners=half?ranked.filter(c=>c.votes*2>=total):ranked.filter(c=>c.votes===max);e.winners=winners.map(c=>c.userId);for(const uid of e.candidates.map(c=>c.userId)){const u=db.users.find(x=>x.id===uid);if(!u)continue;if(u.role===e.type)u.role='STUDENT';u.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles.filter(x=>x!==e.type):[]}for(const uid of e.winners){const u=db.users.find(x=>x.id===uid);if(!u)continue;u.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles:[];if(u.role==='STUDENT')u.role=e.type;else if(u.role!==e.type&&!u.adminRoles.includes(e.type))u.adminRoles.push(e.type);notify(db,u.id,'admin_promotion','管理者に選出されました',e.type+'として選出されました。')}syncAdminTalks(db);return true}
 function finalizeExpiredElections(db){let changed=false;for(const e of db.elections||[]){if(e.status==='OPEN'&&e.endsAt<=Date.now()){finalizeElection(db,e);changed=true}}return changed}
@@ -353,7 +353,7 @@ app.post('/api/super/users/:id/unban',auth,(req,res)=>{
 
 
 function normalizeAdminIdentity(value){
-  return String(value??'').replace(/\u3000/g,' ').trim().replace(/\s+/g,' ');
+  return String(value||'').replace(/\u3000/g,' ').trim().replace(/\s+/g,' ');
 }
 function promoteOwnerToSuperAdmin(){
   try{
