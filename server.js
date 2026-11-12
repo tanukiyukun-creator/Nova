@@ -10,7 +10,7 @@ const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const app=express(); const server=createServer(app); const wss=new WebSocketServer({server,path:'/ws'});
 app.use(express.json({limit:'8mb'})); app.use(express.static(path.join(__dirname,'public')));
 const DB=path.join(__dirname,'db.json');
-const empty={users:[],schools:[],messages:[],classTalks:[],talks:[],friends:[],posts:[],events:[],tasks:[],taskCompletions:[],schedules:[],elections:[],notifications:[],calls:[]};
+const empty={users:[],schools:[],messages:[],classTalks:[],talks:[],friends:[],posts:[],events:[],tasks:[],taskCompletions:[],schedules:[],scheduleChanges:[],elections:[],notifications:[],calls:[]};
 const SCHOOL_STARTER=['早稲田大学高等学院','早稲田実業学校高等部','慶應義塾高等学校','開成高等学校','筑波大学附属高等学校','東京学芸大学附属高等学校','日比谷高等学校','浦和高等学校','浦和第一女子高等学校','川越高等学校','川越女子高等学校','川越東高等学校','熊谷高等学校','山村学園高等学校','山村国際高等学校','大宮高等学校','所沢高等学校','春日部高等学校','越谷北高等学校','栄東高等学校','淑徳与野高等学校','明治大学付属明治高等学校','青山学院高等部','中央大学附属高等学校','立教新座高等学校'];
 function load(){if(!fs.existsSync(DB)) fs.writeFileSync(DB,JSON.stringify(empty,null,2)); return JSON.parse(fs.readFileSync(DB,'utf8'));}
 function save(db){fs.writeFileSync(DB,JSON.stringify(db,null,2));}
@@ -301,7 +301,47 @@ app.post('/api/events',auth,(req,res)=>{if(!(hasRole(req.user,'SUPER_ADMIN')||ha
 app.get('/api/tasks',auth,(req,res)=>{const db=load(),s=scope(req);if(!Array.isArray(db.taskCompletions))db.taskCompletions=[];res.json(db.tasks.filter(t=>t.schoolId===s.schoolId&&t.grade===s.grade&&t.className===s.className).sort((a,b)=>(a.dueAt||Infinity)-(b.dueAt||Infinity)).map(t=>({...t,completed:db.taskCompletions.some(x=>x.taskId===t.id&&x.userId===req.user.id)})))});
 app.post('/api/tasks/:id/complete',auth,(req,res)=>{const db=load();if(!Array.isArray(db.taskCompletions))db.taskCompletions=[];const t=db.tasks.find(x=>x.id===req.params.id);if(!t)return res.status(404).json({error:'課題が見つかりません'});if(!sameGroup(t,req.user))return res.status(403).json({error:'この課題を操作できません'});const i=db.taskCompletions.findIndex(x=>x.taskId===t.id&&x.userId===req.user.id);if(i>=0)db.taskCompletions.splice(i,1);else db.taskCompletions.push({id:id(),taskId:t.id,userId:req.user.id,completedAt:Date.now()});save(db);res.json({completed:i<0})});
 app.post('/api/tasks',auth,(req,res)=>{if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN')))return res.status(403).end();const db=load(),s=scope(req);const t={id:id(),...s,subject:req.body.subject,title:req.body.title,detail:req.body.detail||'',dueAt:req.body.dueAt||null,method:req.body.method||'',createdAt:Date.now()};db.tasks.push(t);db.users.filter(u=>sameGroup(u,req.user)).forEach(u=>notify(db,u.id,'task','課題が追加されました',t.title));save(db);res.json(t)});
-app.get('/api/schedule',auth,(req,res)=>{const db=load(),s=scope(req);res.json(db.schedules.filter(x=>x.schoolId===s.schoolId&&x.grade===s.grade&&x.className===s.className))});
+app.get('/api/schedule',auth,(req,res)=>{
+  const db=load(),s=scope(req);
+  const base=db.schedules.filter(x=>x.schoolId===s.schoolId&&x.grade===s.grade&&x.className===s.className);
+  if(!Array.isArray(db.scheduleChanges))db.scheduleChanges=[];
+  const changes=db.scheduleChanges.filter(x=>x.schoolId===s.schoolId&&x.grade===s.grade&&x.className===s.className);
+  res.json(base.map(x=>({...x,changes:changes.filter(c=>c.scheduleId===x.id)})));
+});
+app.get('/api/schedule/changes',auth,(req,res)=>{
+  const db=load(),s=scope(req);
+  if(!Array.isArray(db.scheduleChanges))db.scheduleChanges=[];
+  res.json(db.scheduleChanges.filter(x=>x.schoolId===s.schoolId&&x.grade===s.grade&&x.className===s.className));
+});
+function canManageScheduleGroup(user,x){
+  if(hasRole(user,'SUPER_ADMIN'))return true;
+  if(hasRole(user,'SCHOOL_ADMIN')&&x.schoolId===user.schoolId)return true;
+  if(hasRole(user,'GRADE_ADMIN')&&x.schoolId===user.schoolId&&x.grade===user.grade)return true;
+  if(hasRole(user,'CLASS_ADMIN')&&sameGroup(x,user))return true;
+  return false;
+}
+app.post('/api/schedule/changes',auth,(req,res)=>{
+  const db=load(),s=scope(req);
+  if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN')))return res.status(403).json({error:'権限がありません'});
+  const date=String(req.body.date||'').trim(),type=String(req.body.type||'').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return res.status(400).json({error:'日付が正しくありません'});
+  if(!['cancel','subject','period','room','temporary'].includes(type))return res.status(400).json({error:'変更種別が正しくありません'});
+  const target={schoolId:s.schoolId,grade:s.grade,className:s.className};
+  if(type!=='temporary'){
+    const base=db.schedules.find(x=>x.id===req.body.scheduleId);
+    if(!base||!canManageScheduleGroup(req.user,base))return res.status(403).json({error:'この時間割を変更できません'});
+    target.scheduleId=base.id;
+  }else target.scheduleId=null;
+  const x={id:id(),...target,date,type,subject:String(req.body.subject||''),period:String(req.body.period||''),room:String(req.body.room||''),note:String(req.body.note||''),createdAt:Date.now(),createdBy:req.user.id};
+  db.scheduleChanges=db.scheduleChanges.filter(y=>!(y.date===date&&y.scheduleId===x.scheduleId&&y.className===x.className&&y.grade===x.grade&&y.schoolId===x.schoolId));
+  db.scheduleChanges.push(x);save(db);res.json(x);
+});
+app.delete('/api/schedule/changes/:id',auth,(req,res)=>{
+  const db=load(),i=(db.scheduleChanges||[]).findIndex(x=>x.id===req.params.id);
+  if(i<0)return res.status(404).json({error:'授業変更が見つかりません'});
+  if(!canManageScheduleGroup(req.user,db.scheduleChanges[i]))return res.status(403).json({error:'権限がありません'});
+  db.scheduleChanges.splice(i,1);save(db);res.json({ok:true});
+});
 app.post('/api/schedule',auth,(req,res)=>{if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN')))return res.status(403).end();const db=load(),s=scope(req);const x={id:id(),...s,day:req.body.day,period:req.body.period,subject:req.body.subject,room:req.body.room||'',note:req.body.note||''};db.schedules.push(x);save(db);res.json(x)});
 app.patch('/api/schedule/:id',auth,(req,res)=>{const db=load(),x=db.schedules.find(x=>x.id===req.params.id);if(!x)return res.status(404).json({error:'時間割が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(x,req.user))return res.status(403).json({error:'権限がありません'});Object.assign(x,{day:String(req.body.day||x.day),period:String(req.body.period||x.period),subject:String(req.body.subject||x.subject),room:String(req.body.room||(x.room||'')),note:String(req.body.note||(x.note||''))});save(db);res.json(x)});
 app.delete('/api/schedule/:id',auth,(req,res)=>{const db=load(),i=db.schedules.findIndex(x=>x.id===req.params.id);if(i<0)return res.status(404).json({error:'時間割が見つかりません'});if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'GRADE_ADMIN')||hasRole(req.user,'CLASS_ADMIN'))||!sameGroup(db.schedules[i],req.user))return res.status(403).json({error:'権限がありません'});db.schedules.splice(i,1);save(db);res.json({ok:true})});
