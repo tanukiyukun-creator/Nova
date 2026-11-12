@@ -593,7 +593,7 @@ function finishStudy(){
 }
 function startRetryStudy(){const s=window.studySession;if(!s?.wrong.length)return toast('間違えた問題はありません');s.pool=[...s.wrong];s.i=0;s.correct=0;s.wrong=[];runStudyQuestion()}
 function finishStudyFlash(){const s=window.flashStudy;$('#main').innerHTML=`<section class="glass card study-result"><div class="eyebrow">FLASHCARD COMPLETE</div><h2>フラッシュカード終了</h2><p>${s.pool.length}語を確認しました。</p><button class="btn primary-btn" onclick="study($('#main'))">もう一度設定</button></section>`}
-async function scheduleView(m){
+async async function scheduleView(m){
   const schedule=await api('/api/schedule');
   const days=['月','火','水','木','金'];
   m.innerHTML='<div class="schedule-page"><section class="glass card"><div class="eyebrow">NOVA SCHEDULE</div><h2>予定・時間割</h2><p class="sub">基本時間割と登録された臨時変更を確認できます。</p><div class="schedule-week">'+days.map(d=>'<div class="schedule-day"><b>'+d+'曜日</b>'+schedule.filter(x=>String(x.day).replace('曜日','')===d).sort((a,b)=>Number(a.period||0)-Number(b.period||0)).map(x=>'<div class="schedule-item"><span>'+esc(x.period)+'限</span><strong>'+esc(x.subject||'授業')+'</strong><small>'+esc(x.room||'')+'</small></div>').join('')||'<div class="home-empty">未登録</div>'+'</div>').join('')+'</div></section></div>';
