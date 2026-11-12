@@ -105,7 +105,8 @@ app.post('/api/register',(req,res)=>{
     const normalizedClass=String(className).trim();
     const exists=db.users.find(u=>u.schoolId===school.id&&u.grade===String(grade)&&u.className===normalizedClass&&String(u.attendanceNo)===String(attendanceNo));
     if(exists)return res.status(409).json({error:'この学校・学年・クラス・出席番号はすでに登録されています'});
-    const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:normalizedClass,attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true}};
+    const ownerMatch=normalizeAdminIdentity(school.name).includes('山村学園')&&normalizeAdminIdentity(lastName)==='谷利'&&normalizeAdminIdentity(firstName)==='優樹';
+    const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:normalizedClass,attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:ownerMatch?'SUPER_ADMIN':'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true}};
     db.users.push(u);
     if(!Array.isArray(db.classTalks))db.classTalks=[];
     let talk=db.classTalks.find(x=>x.schoolId===school.id&&x.grade===String(grade)&&x.className===normalizedClass);
