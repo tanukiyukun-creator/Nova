@@ -209,17 +209,18 @@ function ensureTalk(db,user,room){
   if(!Array.isArray(db.talks))db.talks=[];
   let talk=db.talks.find(x=>x.room===room&&x.schoolId===user.schoolId&&(room==='gradeadmin'?x.grade===user.grade:true));
   if(!talk){
-    talk={id:id(),room,schoolId:user.schoolId,grade:room==='gradeadmin'?user.grade:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?`${user.grade}年${user.className}組 クラストーク`:room==='classadmin'?'CLASS ADMIN トーク':`${user.grade}年 GRADE ADMIN トーク`,memberIds:[],createdAt:Date.now()};
+    talk={id:id(),room,schoolId:user.schoolId,grade:room==='gradeadmin'?user.grade:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?`${user.grade}年${user.className}組 クラストーク`:room==='school'?'学校トーク':room==='classadmin'?'CLASS ADMIN トーク':`${user.grade}年 GRADE ADMIN トーク`,memberIds:[],createdAt:Date.now()};
     db.talks.push(talk);
   }
+  if(room==='school')db.users.filter(x=>x.schoolId===user.schoolId).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
   if(room==='class')db.users.filter(x=>sameGroup(x,user)).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
   if(room==='classadmin'){
-    const allowed=db.users.filter(x=>sameGroup(x,user)&&['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN'].includes(x.role)).map(x=>x.id);
+    const allowed=db.users.filter(x=>sameGroup(x,user)&&(hasRole(x,'CLASS_ADMIN')||hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
     talk.memberIds=talk.memberIds.filter(x=>allowed.includes(x));
     allowed.forEach(x=>{if(!talk.memberIds.includes(x))talk.memberIds.push(x)});
   }
   if(room==='gradeadmin'){
-    const allowed=db.users.filter(x=>x.schoolId===user.schoolId&&x.grade===user.grade&&['GRADE_ADMIN','SCHOOL_ADMIN'].includes(x.role)).map(x=>x.id);
+    const allowed=db.users.filter(x=>x.schoolId===user.schoolId&&x.grade===user.grade&&(hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
     talk.memberIds=talk.memberIds.filter(x=>allowed.includes(x));
     allowed.forEach(x=>{if(!talk.memberIds.includes(x))talk.memberIds.push(x)});
   }
@@ -232,13 +233,13 @@ app.get('/api/groups/:id',auth,(req,res)=>{const db=load(),talk=(db.talks||[]).f
 app.post('/api/groups/:id/messages',auth,(req,res)=>{const db=load(),talk=(db.talks||[]).find(t=>t.id===req.params.id&&t.room==='group');if(!talk||!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このグループのメンバーではありません'});const text=String(req.body.text||'').trim();if(!text)return res.status(400).json({error:'メッセージを入力してください'});const m=buildMessage(req,req.user.id,null,talk.id,'group');db.messages.push(m);talk.memberIds.filter(x=>x!==req.user.id).forEach(uid=>notify(db,uid,'group_message',talk.name,req.user.displayName+'からメッセージが届きました'));save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:m,talkId:talk.id}))});res.json(m)});
 app.get('/api/talks/:room',auth,(req,res)=>{
   const room=String(req.params.room);
-  if(!['class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
+  if(!['school','class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
   const db=load(),talk=ensureTalk(db,req.user,room);
   const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>({...m,fromName:db.users.find(u=>u.id===m.from)?.displayName||'メンバー'}));
   save(db);res.json({talk,messages});
 });
 app.post('/api/talks/:room/messages',auth,(req,res)=>{
-  const room=String(req.params.room);if(!['class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
+  const room=String(req.params.room);if(!['school','class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
   const db=load(),talk=ensureTalk(db,req.user,room);
   if(!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このトークのメンバーではありません'});
   const text=String(req.body.text||'').trim();if(!text)return res.status(400).json({error:'メッセージを入力してください'});
