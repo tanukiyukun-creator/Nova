@@ -661,9 +661,21 @@ function parseBook(id2,t){
 }
 function studyShuffle(a){return [...a].sort(()=>Math.random()-.5)}
 function studyWrongKey(id2){return 'novaStudyWrong_'+id2}
+function studySeenKey(id2){return 'novaStudySeen_'+id2}
+function studyStatsKey(id2){return 'novaStudyStats_'+id2}
 function studyGetWrong(id2){try{return JSON.parse(localStorage.getItem(studyWrongKey(id2))||'[]')}catch{return[]}}
+function studyGetSeen(id2){try{return JSON.parse(localStorage.getItem(studySeenKey(id2))||'[]')}catch{return[]}}
 function studySaveWrong(id2,no){
   const a=studyGetWrong(id2);if(!a.includes(no))a.push(no);localStorage.setItem(studyWrongKey(id2),JSON.stringify(a));
+}
+function studySaveSeen(id2,no){
+  const a=studyGetSeen(id2);if(!a.includes(no))a.push(no);localStorage.setItem(studySeenKey(id2),JSON.stringify(a));
+}
+function studySaveStat(id2,ok){
+  let s={answered:0,correct:0};
+  try{s={...s,...JSON.parse(localStorage.getItem(studyStatsKey(id2))||'{}')}}catch{}
+  s.answered++;if(ok)s.correct++;
+  localStorage.setItem(studyStatsKey(id2),JSON.stringify(s));
 }
 function studySpeak(text,lang){
   if(!window.speechSynthesis)return;
@@ -674,11 +686,15 @@ function startStudy(id2){
   const a=window.NOVA_BOOKS?.[id2]||[];
   const range=parseStudyRanges($('#studyRange')?.value,a.length);
   if(!range.length)return toast('範囲を正しく入力してください');
-  let pool=range.map(i=>a[i]).filter(Boolean);
+  const byNo=new Map(a.map(x=>[Number(x.no),x]));
+  let pool=range.map(i=>byNo.get(i+1)).filter(Boolean);
+  if(!pool.length)return toast('指定した範囲の単語が見つかりません');
   const order=$('#studyOrder').value;
+  const wrongSet=new Set(studyGetWrong(id2));
+  const seenSet=new Set(studyGetSeen(id2));
   if(order==='random')pool=studyShuffle(pool);
-  if(order==='wrong'){const w=new Set(studyGetWrong(id2));pool=[...pool.filter(x=>w.has(x.no)),...pool.filter(x=>!w.has(x.no))]}
-  if(order==='unseen'){const seen=new Set(JSON.parse(localStorage.getItem('novaStudySeen_'+id2)||'[]'));pool=[...pool.filter(x=>!seen.has(x.no)),...pool.filter(x=>seen.has(x.no))]}
+  if(order==='wrong')pool=[...pool.filter(x=>wrongSet.has(x.no)),...pool.filter(x=>!wrongSet.has(x.no))];
+  if(order==='unseen')pool=[...pool.filter(x=>!seenSet.has(x.no)),...pool.filter(x=>seenSet.has(x.no))];
   let count=Math.min(Math.max(1,Number($('#studyCount').value)||20),pool.length);
   pool=pool.slice(0,count);
   const direction=$('#studyDirection').value,mode=$('#studyMode').value,speak=$('#studySpeak').checked;
@@ -686,15 +702,18 @@ function startStudy(id2){
   window.studySession={id:id2,pool,i:0,correct:0,wrong:[],direction,mode,speak,currentPair:null,answered:false};
   runStudyQuestion();
 }
-function studyQuestionPair(x,direction){
+function studyQuestionPair(x,direction,index=0){
+  if(direction==='both'){
+    return index%2===0?{q:x.q,a:x.a,lang:'en-US'}:{q:x.a,a:x.q,lang:'ja-JP'};
+  }
   const dir=direction==='random'?(Math.random()<.5?'en-ja':'ja-en'):direction;
-  if(dir==='both')return Math.random()<.5?{q:x.q,a:x.a,lang:'en-US'}:{q:x.a,a:x.q,lang:'ja-JP'};
   return dir==='ja-en'?{q:x.a,a:x.q,lang:'ja-JP'}:{q:x.q,a:x.a,lang:'en-US'};
 }
 function renderStudyFeedback(ok){
   const s=window.studySession;if(!s||!s.currentPair)return;
   const x=s.pool[s.i],p=s.currentPair;
-  const seenKey='novaStudySeen_'+s.id,seen=new Set(JSON.parse(localStorage.getItem(seenKey)||'[]'));seen.add(x.no);localStorage.setItem(seenKey,JSON.stringify([...seen]));
+  studySaveSeen(s.id,x.no);
+  studySaveStat(s.id,ok);
   if(ok)s.correct++;else{studySaveWrong(s.id,x.no);s.wrong.push(x)}
   s.answered=true;
   $('#main').innerHTML=`<section class="glass card study-question study-feedback">
@@ -714,10 +733,14 @@ function nextStudyQuestion(){
 }
 function runStudyQuestion(){
   const s=window.studySession;if(!s||s.i>=s.pool.length)return finishStudy();
-  const x=s.pool[s.i],p=studyQuestionPair(x,s.direction);
+  const x=s.pool[s.i],p=studyQuestionPair(x,s.direction,s.i);
   s.currentPair=p;s.answered=false;
-  const distractors=studyShuffle(s.pool.filter(y=>y!==x).map(y=>y.a)).slice(0,3);
-  const choices=studyShuffle([p.a,...distractors]);
+  const others=s.pool.filter(y=>y!==x);
+  const sameType=others.filter(y=>y.type===x.type);
+  const source=(s.mode==='choice-hard'&&sameType.length>=3)?sameType:others;
+  const distractors=studyShuffle(source.map(y=>studyQuestionPair(y,s.direction,s.i).a).filter(v=>String(v)!==String(p.a))).slice(0,3);
+  const fallback=studyShuffle(others.map(y=>studyQuestionPair(y,s.direction,s.i).a).filter(v=>String(v)!==String(p.a)));
+  const choices=studyShuffle([p.a,...distractors,...fallback]).slice(0,4);
   if(s.mode==='choice'||s.mode==='choice-hard'){
     $('#main').innerHTML=`<section class="glass card study-question"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-question-type">${p.lang==='en-US'?'ENGLISH':'JAPANESE'}</div><div class="study-prompt">${esc(p.q)}</div><div class="study-actions">${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':''}</div><div class="study-choices">${choices.map(o=>`<button class="study-choice" onclick="renderStudyFeedback(${JSON.stringify(o)}===${JSON.stringify(p.a)})">${esc(o)}</button>`).join('')}</div></section>`;
     if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
@@ -743,7 +766,7 @@ function runFlashStudy(id2,pool,direction,speak){
 }
 function renderFlashStudy(){
   const s=window.flashStudy;if(!s||s.i>=s.pool.length)return finishStudyFlash();
-  const x=s.pool[s.i],p=studyQuestionPair(x,s.direction);s.currentPair=p;
+  const x=s.pool[s.i],p=studyQuestionPair(x,s.direction,s.i);s.currentPair=p;
   $('#main').innerHTML=`<section class="glass card study-question flash-study"><div class="study-progress">${s.i+1} / ${s.pool.length}</div><div class="study-flash-card" onclick="flashStudyReveal()"><span>${s.show?'答え':'問題'}</span><strong>${esc(s.show?p.a:p.q)}</strong><small>${s.show?'タップで次へ':'タップして答えを見る'}</small></div>${s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 もう一度読み上げ</button>':''}</section>`;
   if(s.speak&&!s.show)setTimeout(()=>studySpeak(p.q,p.lang),250);
 }
