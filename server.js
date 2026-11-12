@@ -225,7 +225,7 @@ function ensureTalk(db,user,room){
   if(!Array.isArray(db.talks))db.talks=[];
   let talk=db.talks.find(x=>x.room===room&&x.schoolId===user.schoolId&&(room==='gradeadmin'?true:true));
   if(!talk){
-    talk={id:id(),room,schoolId:user.schoolId,grade:room==='gradeadmin'?null:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?`${user.grade}年${user.className}組 クラストーク`:room==='school'?'学校トーク':room==='classadmin'?'CLASS ADMIN トーク':`${user.grade}年 GRADE ADMIN トーク`,memberIds:[],createdAt:Date.now()};
+    talk={id:id(),room,schoolId:user.schoolId,grade:room==='gradeadmin'?null:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?`${user.grade}年${user.className}組 クラストーク`:room==='school'?'学校トーク':room==='classadmin'?'CLASS ADMIN トーク':'GRADE ADMIN トーク',memberIds:[],createdAt:Date.now()};
     db.talks.push(talk);
   }
   if(room==='school')db.users.filter(x=>x.schoolId===user.schoolId).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
@@ -338,11 +338,11 @@ app.post('/api/elections/:id/reelection-request',auth,(req,res)=>{const db=load(
 app.post('/api/me/leave-admin',auth,(req,res)=>{const db=load(),u=db.users.find(x=>x.id===req.user.id);const role=String(req.body.role||'');if(!['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN'].includes(role)||!hasRole(u,role))return res.status(400).json({error:'その管理者権限はありません'});u.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles.filter(x=>x!==role):[];if(u.role===role)u.role='STUDENT';triggerReelectionForRole(db,role,u);syncAdminTalks(db);save(db);res.json({ok:true,user:pub(u)});});
 app.get('/api/study/books',auth,(req,res)=>res.json([{id:'target1200',name:'ターゲット1200',path:'/data/target1200.txt'},{id:'target1900',name:'ターゲット1900',path:'/data/target1900.txt'},{id:'tekkyoku',name:'鉄壁',path:'/data/tekkyoku.txt'},{id:'irohani',name:'いろはにほへと古文単語',path:'/data/irohani.txt'}]));
 app.get('/data/:file', (req,res)=>{const base=path.join(__dirname,'data'); const file=path.basename(req.params.file); const allowed=new Set(['target1200.txt','target1900.txt','tekkyoku.txt','irohani.txt']); if(!allowed.has(file))return res.status(404).end(); const p=path.join(base,file); if(!fs.existsSync(p))return res.status(404).json({error:'単語帳データが見つかりません'}); res.sendFile(p)});
-app.get('/api/admins',auth,(req,res)=>{const db=load();res.json(db.users.filter(u=>u.schoolId===req.user.schoolId&&u.role!=='STUDENT').map(pub))});
+app.get('/api/admins',auth,(req,res)=>{const db=load();res.json(db.users.filter(u=>u.schoolId===req.user.schoolId&&(hasRole(u,'CLASS_ADMIN')||hasRole(u,'GRADE_ADMIN')||hasRole(u,'SCHOOL_ADMIN')||hasRole(u,'SUPER_ADMIN'))).map(pub))});
 app.get('/api/debug/state',auth,(req,res)=>{if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).end();const db=load();res.json({...db,users:db.users.map(pub)});});
 app.post('/api/super/users/:id/role',auth,(req,res)=>{if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).json({error:'権限がありません'});const db=load(),u=db.users.find(x=>x.id===req.params.id);if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});const role=String(req.body.role||'STUDENT');const oldRoles=[u.role,...(Array.isArray(u.adminRoles)?u.adminRoles:[])];const allowed=['STUDENT','CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'];if(!allowed.includes(role))return res.status(400).json({error:'不正な権限です'});if(u.id===req.user.id&&role!=='SUPER_ADMIN')return res.status(400).json({error:'自分のSUPER ADMIN権限は剥奪できません'});u.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles:[];if(role==='STUDENT'){u.role='STUDENT';u.adminRoles=[]}else if(u.role==='STUDENT')u.role=role;else if(u.role!==role&&!u.adminRoles.includes(role))u.adminRoles.push(role);for(const r of oldRoles.filter(r=>r!=='STUDENT'&&!([role].includes(r))))triggerReelectionForRole(db,r,u);syncAdminTalks(db);save(db);res.json({ok:true,user:pub(u)})});
 app.post('/api/super/users/:id/ban',auth,(req,res)=>{
-  if(req.user.role!=='SUPER_ADMIN')return res.status(403).json({error:'権限がありません'});
+  if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).json({error:'権限がありません'});
   const db=load(),u=db.users.find(x=>x.id===req.params.id);
   if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});
   if(hasRole(u,'SUPER_ADMIN'))return res.status(400).json({error:'SUPER ADMINはBANできません'});
