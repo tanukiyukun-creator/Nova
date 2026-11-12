@@ -315,7 +315,7 @@ async function chat(m){
   const room=rooms.find(r=>r.id===chatRoom);
   const title=selectedFriend?.displayName||selectedGroup?.name||room?.title||'トーク';
   const sub=selectedFriend?'個人トーク':selectedGroup?(selectedGroup.memberIds.length+'人のグループ'):room?.sub||'';
-  const boxHtml=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom);
+  let boxHtml=''; try{boxHtml=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom)}catch(e){boxHtml='<div class="chat-empty-state"><b>トークを読み込めませんでした</b><small>'+esc(e.message||'通信エラー')+'</small></div>'}
   const canCompose=!!(chatRoom==='friend'&&chatTarget)||rooms.some(r=>r.id===chatRoom)||!!selectedGroup;
   const roomButton=r=>'<button class="line-room '+(chatRoom===r.id?'on':'')+'" onclick="selectChatRoom(\''+r.id+'\')"><span class="line-avatar">'+r.icon+'</span><span class="line-room-copy"><b>'+esc(r.title)+'</b><small>'+esc(r.sub)+'</small></span></button>';
   const groupButton=g=>'<button class="line-room '+(chatRoom==='group:'+g.id?'on':'')+'" onclick="selectChatRoom(\'group:'+g.id+'\')"><span class="line-avatar">G</span><span class="line-room-copy"><b>'+esc(g.name)+'</b><small>'+g.memberIds.length+'人</small></span></button>';
