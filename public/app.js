@@ -543,10 +543,10 @@ async function adminPanel(){
       <div class="h">ADMIN CONTROL</div>
       <p class="sub">現在の権限で実行できる管理機能です。</p>
       <div class="row">
-        ${canManage?'<button class="btn alt" onclick="scheduleView(\$('#main\'))">時間割・授業変更</button>':''}
+        ${canManage?'<button class="btn alt" onclick="scheduleView(document.getElementById('main'))">時間割・授業変更</button>':''}
         ${canManage?'<button class="btn alt" onclick="createTaskPrompt()">課題を追加</button>':''}
         ${canSchool?'<button class="btn alt" onclick="createEventPrompt()">学校行事を追加</button>':''}
-        ${canSchool?'<button class="btn alt" onclick="settings(\$('#main\'))">学校・生徒管理</button>':''}
+        ${canSchool?'<button class="btn alt" onclick="settings(document.getElementById('main'))">学校・生徒管理</button>':''}
         ${canSuper?'<button class="btn alt" onclick="go(\'superadmin\')">SUPER ADMIN画面</button>':''}
       </div>
     </section>
