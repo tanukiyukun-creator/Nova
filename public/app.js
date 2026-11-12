@@ -595,9 +595,15 @@ function finishStudy(){
 function startRetryStudy(){const s=window.studySession;if(!s?.wrong.length)return toast('間違えた問題はありません');s.pool=[...s.wrong];s.i=0;s.correct=0;s.wrong=[];runStudyQuestion()}
 function finishStudyFlash(){const s=window.flashStudy;$('#main').innerHTML=`<section class="glass card study-result"><div class="eyebrow">FLASHCARD COMPLETE</div><h2>フラッシュカード終了</h2><p>${s.pool.length}語を確認しました。</p><button class="btn primary-btn" onclick="study($('#main'))">もう一度設定</button></section>`}
 async async function scheduleView(m){
-  const schedule=await api('/api/schedule');
+  let schedule=[];
+  try{schedule=await api('/api/schedule')}catch(e){return m.innerHTML='<div class="glass card"><h2>時間割を読み込めませんでした</h2><p class="sub">'+esc(e.message)+'</p></div>'}
   const days=['月','火','水','木','金'];
-  m.innerHTML='<div class="schedule-page"><section class="glass card"><div class="eyebrow">NOVA SCHEDULE</div><h2>予定・時間割</h2><p class="sub">基本時間割と登録された臨時変更を確認できます。</p><div class="schedule-week">'+days.map(d=>'<div class="schedule-day"><b>'+d+'曜日</b>'+schedule.filter(x=>String(x.day).replace('曜日','')===d).sort((a,b)=>Number(a.period||0)-Number(b.period||0)).map(x=>'<div class="schedule-item"><span>'+esc(x.period)+'限</span><strong>'+esc(x.subject||'授業')+'</strong><small>'+esc(x.room||'')+'</small></div>').join('')||'<div class="home-empty">未登録</div>'+'</div>').join('')+'</div></section></div>';
+  const canEdit=hasClientRole('SUPER_ADMIN')||hasClientRole('SCHOOL_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('CLASS_ADMIN');
+  m.innerHTML='<div class="schedule-page"><section class="glass card"><div class="eyebrow">NOVA SCHEDULE</div><h2>予定・時間割</h2><p class="sub">クラスの基本時間割を登録できます。</p><div class="schedule-week">'+days.map(d=>'<div class="schedule-day"><b>'+d+'曜日</b>'+schedule.filter(x=>String(x.day).replace('曜日','')===d).sort((a,b)=>Number(a.period||0)-Number(b.period||0)).map(x=>'<div class="schedule-item"><span>'+esc(x.period)+'限</span><strong>'+esc(x.subject||'授業')+'</strong><small>'+esc(x.room||'')+'</small></div>').join('')||'<div class="home-empty">未登録</div>'+'</div>').join('')+'</div></section>'+(canEdit?'<section class="glass card schedule-editor"><div class="eyebrow">CLASS ADMIN</div><h3>時間割を追加</h3><form class="schedule-add-form" onsubmit="addSchedule(event)"><select class="input" name="day"><option>月</option><option>火</option><option>水</option><option>木</option><option>金</option></select><input class="input" name="period" type="number" min="1" max="10" placeholder="限" required><input class="input" name="subject" placeholder="科目" required><input class="input" name="room" placeholder="教室（任意）"><button class="btn primary-btn">追加</button></form></section>':'')+'</div>';
+}
+async function addSchedule(e){
+  e.preventDefault();const f=new FormData(e.target);
+  try{await api('/api/schedule',{method:'POST',body:JSON.stringify({day:f.get('day'),period:f.get('period'),subject:f.get('subject'),room:f.get('room')||''})});toast('時間割を追加しました');await render(true)}catch(x){toast(x.message)}
 }
 async function settings(m){
   m.innerHTML=`<div class="settings-page">
