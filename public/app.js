@@ -306,8 +306,8 @@ async function chat(m){
   const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(hasClientRole('CLASS_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
   if(hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'gradeadmin',title:me.grade+'年 GRADE ADMIN',sub:'学年管理者',icon:'G'});
-  if(!friends.length)friends=await api('/api/friends');
-  const groups=await api('/api/groups');
+  if(!friends.length){try{friends=await api('/api/friends')}catch(e){friends=[];console.warn('friends load failed',e)}}
+  let groups=[];try{groups=await api('/api/groups')}catch(e){groups=[];console.warn('groups load failed',e)}
   if(chatRoom==='school')chatRoom='class';
   if(!rooms.some(r=>r.id===chatRoom)&&!chatRoom.startsWith('group:')&&chatRoom!=='friend')chatRoom='class';
   const selectedFriend=chatRoom==='friend'&&chatTarget?friends.find(x=>x.id===chatTarget):null;
@@ -423,7 +423,7 @@ function messageBubble(x){
 }
 function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
 function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
-function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if((x.type==='message'||x.type==='group_message')&&view==='chat')chat($('#main'));if(x.type==='call_signal')handleCallSignal(x)}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}
+function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if((x.type==='message'||x.type==='group_message'||x.type==='class_message')&&view==='chat')chat($('#main'));if(x.type==='call_signal')handleCallSignal(x)}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}
 function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
 let novaPeers={},novaStream=null,novaTargets=[],novaMode=null,novaRoomKey=null,novaCallId=null;
 function callScope(){
