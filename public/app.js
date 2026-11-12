@@ -511,9 +511,9 @@ function parseBook(id2,t){
   }
   const out=[];
   for(const l of lines){
-    const m=l.match(/^(\\d+)[\\t ]+(.+?)[\\t ]{2,}(.+)$/);
+    const m=l.match(/^(\d+)[\t ]+(.+?)[\t ]{2,}(.+)$/);
     if(m)out.push({no:Number(m[1]),q:m[2].trim(),a:m[3].trim(),type:'en'});
-    else {const m2=l.match(/^(\\d+)[\\t ]+([^\\t ]+)[\\t ]+(.+)$/);if(m2)out.push({no:Number(m2[1]),q:m2[2].trim(),a:m2[3].trim(),type:'en'})}
+    else {const m2=l.match(/^(\d+)[\t ]+([^\t ]+)[\t ]+(.+)$/);if(m2)out.push({no:Number(m2[1]),q:m2[2].trim(),a:m2[3].trim(),type:'en'})}
   }
   return out;
 }
