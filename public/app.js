@@ -281,7 +281,7 @@ async function home(m){
 }
 let chatRoom='class';
 let chatTarget=null;
-async async function chat(m){
+async function chat(m){
   wsConnect();
   const rooms=[{id:'school',title:'学校',sub:'学校全体',icon:'S'},{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(hasClientRole('CLASS_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
@@ -455,7 +455,7 @@ async function schoolGrade(){view='school';const m=$('#main');const p=await api(
 async function vote(e,c){try{await api('/api/elections/'+e+'/vote',{method:'POST',body:JSON.stringify({candidateId:c})});toast('投票しました');school($('#main'))}catch(x){toast(x.message)}}
 async function adminPanel(){const admins=await api('/api/admins');$('#main').innerHTML=`<div class="grid"><section class="glass card span6"><div class="h">ADMINISTRATORS</div>${admins.map(a=>`<div class="item row"><div class="avatar">${esc(a.icon)}</div><div><b>${esc(a.displayName)}</b><div class="sub">${esc(a.role)}</div></div></div>`).join('')||'<p class="sub">管理者はいません</p>'}</section><section class="glass card span6"><div class="h">ELECTION START</div><p class="sub">候補者を選んで管理者選挙を開始します。</p><button class="btn alt" onclick="startElection('CLASS_ADMIN')">CLASS_ADMIN選挙</button><button class="btn alt" onclick="startElection('GRADE_ADMIN')">GRADE_ADMIN選挙</button><button class="btn alt" onclick="startElection('SCHOOL_ADMIN')">SCHOOL_ADMIN選挙</button></section></div>`}async function startElection(type){const us=await api('/api/users/search?q=');const ids=us.slice(0,5).map(x=>x.id);try{await api('/api/elections',{method:'POST',body:JSON.stringify({type,candidateIds:ids})});toast('選挙を開始しました');school($('#main'))}catch(x){toast(x.message)}}
 async function people(m){const f=await api('/api/friends');m.innerHTML=`<div class="glass card"><div class="row"><input id="uq" class="input" placeholder="友達を検索" oninput="searchUsers()"></div><div id="users" class="list">${f.map(x=>userRow(x,false)).join('')}</div></div>`}function userRow(u,friend=true){return `<div class="item row"><div class="avatar">${esc(u.icon)}</div><div style="flex:1"><b>${esc(u.displayName)}</b><div class="sub">${esc(u.schoolName)} / ${esc(u.grade)}年${esc(u.className)}</div></div>${friend?'':'<button class="btn alt" onclick="addFriend(\''+u.id+'\')">追加</button>'}</div>`}async function searchUsers(){const q=$('#uq').value;const us=await api('/api/users/search?q='+encodeURIComponent(q));$('#users').innerHTML=us.map(x=>userRow(x,false)).join('')||'<p class="sub">見つかりません</p>'}async function addFriend(id2){await api('/api/friends/'+id2,{method:'POST'});toast('友達に追加しました');people($('#main'))}
-async async function study(m){
+async function study(m){
   books=await api('/api/study/books');
   m.innerHTML=`<div class="study-page">
     <section class="study-hero glass">
