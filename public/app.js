@@ -298,7 +298,7 @@ async function chat(m){
   const roomButton=r=>'<button class="line-room '+(chatRoom===r.id?'on':'')+'" onclick="selectChatRoom(\''+r.id+'\')"><span class="line-avatar">'+r.icon+'</span><span class="line-room-copy"><b>'+esc(r.title)+'</b><small>'+esc(r.sub)+'</small></span></button>';
   const groupButton=g=>'<button class="line-room '+(chatRoom==='group:'+g.id?'on':'')+'" onclick="selectChatRoom(\'group:'+g.id+'\')"><span class="line-avatar">G</span><span class="line-room-copy"><b>'+esc(g.name)+'</b><small>'+g.memberIds.length+'人</small></span></button>';
   const friendButton=f=>'<button class="line-room '+(chatRoom==='friend'&&chatTarget===f.id?'on':'')+'" onclick="openChat(\''+f.id+'\')">'+avatarHtml(f)+'<span class="line-room-copy"><b>'+esc(f.displayName)+'</b><small>個人チャット</small></span></button>';
-  m.innerHTML='<div class="line-chat"><aside class="line-chat-list glass '+(selectedFriend?'mobile-hide':'')+'"><div class="line-list-head"><div><div class="eyebrow">NOVA</div><h2>トーク</h2></div><button class="line-new" onclick="createGroup()">＋</button></div><div class="line-search"><input class="input" placeholder="トーク・友達を検索" oninput="filterChatList(this.value)"></div><div id="lineRoomList"><div class="line-label">学校</div>'+rooms.map(roomButton).join('')+'<div class="line-label">グループ</div>'+(groups.map(groupButton).join('')||'<div class="line-empty">グループはありません</div>')+'<div class="line-label">友達</div>'+(friends.map(friendButton).join('')||'<div class="line-empty">友達を追加するとここに表示されます</div>')+'</div></aside><section class="line-chat-main glass '+(selectedFriend?'mobile-show':'')+'"><header class="line-header"><button class="line-back" onclick="selectChatRoom(\'class\')">‹</button><div class="line-header-avatar">'+(selectedFriend?avatarHtml(selectedFriend):'<span class="line-avatar">'+(selectedGroup?'G':room?.icon||'C')+'</span>')+'</div><div class="line-header-name"><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div>'+'<div class="line-call">'+(selectedFriend?'<button class="line-call-btn" title="音声通話" onclick="startCall(\'audio\')">☎</button><button class="line-call-btn" title="ビデオ通話" onclick="startCall(\'video\')">▣</button>':'')+'</div>'+'</header><div id="chatbox" class="line-messages">'+boxHtml+'</div>'+(canCompose?'<div id="replyPreview" class="chat-reply-preview hidden"></div><form class="line-compose" onsubmit="sendCurrentChat(event)"><label class="line-attach">＋<input type="file" accept="image/*" hidden onchange="sendImageFile(event)"></label><input id="chatText" class="line-input" name="text" placeholder="メッセージ" autocomplete="off"><button class="line-send" type="submit">➤</button></form>':'<div class="line-readonly">このトークにはメッセージを送信できません。</div>')+'</section></div>';
+  m.innerHTML='<div class="line-chat"><aside class="line-chat-list glass '+(selectedFriend?'mobile-hide':'')+'"><div class="line-list-head"><div><div class="eyebrow">NOVA</div><h2>トーク</h2></div><button class="line-new" onclick="createGroup()">＋</button></div><div class="line-search"><input class="input" placeholder="トーク・友達を検索" oninput="filterChatList(this.value)"></div><div id="lineRoomList"><div class="line-label">学校</div>'+rooms.map(roomButton).join('')+'<div class="line-label">グループ</div>'+(groups.map(groupButton).join('')||'<div class="line-empty">グループはありません</div>')+'<div class="line-label">友達</div>'+(friends.map(friendButton).join('')||'<div class="line-empty">友達を追加するとここに表示されます</div>')+'</div></aside><section class="line-chat-main glass '+(selectedFriend?'mobile-show':'')+'"><header class="line-header"><button class="line-back" onclick="selectChatRoom(\'class\')">‹</button><div class="line-header-avatar">'+(selectedFriend?avatarHtml(selectedFriend):'<span class="line-avatar">'+(selectedGroup?'G':room?.icon||'C')+'</span>')+'</div><div class="line-header-name"><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div>'+'<div class="line-call">'+((selectedFriend||selectedGroup||room)?'<button class="line-call-btn" title="音声通話" onclick="startCall(\'audio\')">☎</button><button class="line-call-btn video" title="ビデオ通話" onclick="startCall(\'video\')">▣</button>':'')+'</div>'+'</header><div id="chatbox" class="line-messages">'+boxHtml+'</div>'+(canCompose?'<div id="replyPreview" class="chat-reply-preview hidden"></div><form class="line-compose" onsubmit="sendCurrentChat(event)"><label class="line-attach">＋<input type="file" accept="image/*" hidden onchange="sendImageFile(event)"></label><input id="chatText" class="line-input" name="text" placeholder="メッセージ" autocomplete="off"><button class="line-send" type="submit">➤</button></form>':'<div class="line-readonly">このトークにはメッセージを送信できません。</div>')+'</section></div>';
 }
 function filterChatList(q){const s=String(q||'').trim().toLowerCase();document.querySelectorAll('#lineRoomList .line-room').forEach(b=>{b.style.display=!s||b.textContent.toLowerCase().includes(s)?'flex':'none'})}async function createGroup(){
   if(!friends.length)friends=await api('/api/friends');
@@ -330,11 +330,86 @@ function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.nov
 function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
 function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if((x.type==='message'||x.type==='group_message')&&view==='chat')chat($('#main'));if(x.type==='call_signal')handleCallSignal(x)}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}
 function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
-let novaPeer=null,novaStream=null,novaTarget=null;
-async function startCall(mode){if(chatRoom!=='friend'||!chatTarget)return toast('個人トークで通話できます');try{novaTarget=chatTarget;novaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:mode==='video'});novaPeer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});novaStream.getTracks().forEach(t=>novaPeer.addTrack(t,novaStream));novaPeer.onicecandidate=e=>e.candidate&&sendSignal({type:'call_signal',action:'ice',toUserId:novaTarget,candidate:e.candidate});novaPeer.ontrack=e=>{const v=document.getElementById("remoteVideo");if(v)v.srcObject=e.streams[0];const a=document.getElementById("remoteAudio");if(a)a.srcObject=e.streams[0]};const offer=await novaPeer.createOffer();await novaPeer.setLocalDescription(offer);sendSignal({type:'call_signal',action:'offer',toUserId:novaTarget,mode,offer});showCall(mode,novaStream)}catch{endCall();toast('通話を開始できませんでした')}}
-function showCall(mode,stream){let b=$('#callWindow');if(!b){b=document.createElement('div');b.id='callWindow';b.className='call-window glass';document.body.append(b)}b.innerHTML='<div class="call-head"><b>'+(mode==='video'?'ビデオ通話':'音声通話')+'</b><button onclick="endCall()">×</button></div><div class="call-stage">'+(mode==='video'?'<video id="remoteVideo" autoplay playsinline></video>':'<div class="call-avatar">☎</div>')+'<audio id="remoteAudio" autoplay></audio>'+(mode==='video'?'<video id="localVideo" autoplay muted playsinline></video>':'')+'</div><div class="call-controls"><button class="call-end" onclick="endCall()">通話を終了</button></div>';if(mode==='video'&&stream&&$('#localVideo'))$('#localVideo').srcObject=stream}
-function handleCallSignal(x){if(x.action==='offer'){if(novaPeer)return;if(!confirm('着信があります。通話に出ますか？')){sendSignal({type:'call_signal',action:'reject',toUserId:x.fromUserId});return}navigator.mediaDevices.getUserMedia({audio:true,video:x.mode==='video'}).then(async s=>{novaTarget=x.fromUserId;novaStream=s;novaPeer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});s.getTracks().forEach(t=>novaPeer.addTrack(t,s));novaPeer.onicecandidate=e=>e.candidate&&sendSignal({type:'call_signal',action:'ice',toUserId:x.fromUserId,candidate:e.candidate});novaPeer.ontrack=e=>{const v=document.getElementById("remoteVideo");if(v)v.srcObject=e.streams[0];const a=document.getElementById("remoteAudio");if(a)a.srcObject=e.streams[0]};await novaPeer.setRemoteDescription(x.offer);const ans=await novaPeer.createAnswer();await novaPeer.setLocalDescription(ans);sendSignal({type:'call_signal',action:'answer',toUserId:x.fromUserId,answer:ans});showCall(x.mode,s)}).catch(()=>endCall())}else if(x.action==='answer'&&novaPeer)novaPeer.setRemoteDescription(x.answer);else if(x.action==='ice'&&novaPeer)novaPeer.addIceCandidate(x.candidate).catch(()=>{});else if(x.action==='reject')toast('相手が応答しませんでした');else if(x.action==='hangup')endCall()}
-function endCall(){if(novaTarget)sendSignal({type:'call_signal',action:'hangup',toUserId:novaTarget});novaPeer?.close();novaPeer=null;novaStream?.getTracks().forEach(t=>t.stop());novaStream=null;novaTarget=null;$('#callWindow')?.remove()}
+let novaPeers={},novaStream=null,novaTargets=[],novaMode=null,novaRoomKey=null,novaCallId=null;
+function callScope(){
+  if(chatRoom==='friend')return {scope:'friend',ids:chatTarget?[chatTarget]:[]};
+  if(chatRoom==='class'||chatRoom==='classadmin'||chatRoom==='gradeadmin')return {scope:chatRoom,ids:[]};
+  if(chatRoom.startsWith('group:'))return {scope:'group',groupId:chatRoom.slice(6),ids:[]};
+  return null;
+}
+async function getCallParticipants(){
+  const c=callScope();if(!c)return [];
+  if(c.scope==='friend')return friends.filter(x=>c.ids.includes(x.id));
+  const q=new URLSearchParams({scope:c.scope});if(c.groupId)q.set('groupId',c.groupId);
+  const r=await api('/api/call/participants?'+q.toString());return r.participants||[];
+}
+function peerKey(id){return String(id)}
+function sendCallSignal(toUserId,payload){sendSignal({type:'call_signal',toUserId,...payload})}
+function createCallPeer(userId,initiator){
+  const key=peerKey(userId);if(novaPeers[key])return novaPeers[key];
+  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  novaPeers[key]=pc;
+  if(novaStream)novaStream.getTracks().forEach(t=>pc.addTrack(t,novaStream));
+  pc.onicecandidate=e=>{if(e.candidate)sendCallSignal(userId,{action:'ice',callId:novaCallId,candidate:e.candidate})};
+  pc.ontrack=e=>attachRemoteStream(userId,e.streams[0]);
+  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))removeRemoteStream(userId)};
+  if(initiator)pc.createOffer().then(o=>pc.setLocalDescription(o)).then(()=>sendCallSignal(userId,{action:'offer',callId:novaCallId,mode:novaMode,offer:pc.localDescription})).catch(()=>{});
+  return pc;
+}
+function attachRemoteStream(userId,stream){
+  let stage=$('#callStage');if(!stage)return;
+  let v=document.getElementById('remote_'+userId);
+  if(!v){v=document.createElement('video');v.id='remote_'+userId;v.autoplay=true;v.playsInline=true;v.className='remote-peer-video';v.dataset.userId=userId;stage.appendChild(v)}
+  v.srcObject=stream;
+}
+function removeRemoteStream(userId){document.getElementById('remote_'+userId)?.remove()}
+async function startCall(mode){
+  const c=callScope();if(!c)return toast('このトークでは通話できません');
+  try{
+    const participants=await getCallParticipants();
+    if(c.scope!=='friend'&&participants.length>7)return toast('通話は同時に8人までです');
+    novaMode=mode;novaRoomKey=chatRoom;novaCallId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+    novaTargets=participants.map(x=>x.id);
+    novaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:mode==='video'});
+    showCall(mode,novaStream);
+    if(!participants.length)return toast('通話相手がオンラインではありません');
+    for(const p of participants)createCallPeer(p.id,true);
+  }catch{endCall(false);toast('通話を開始できませんでした')}
+}
+function showCall(mode,stream){
+  let b=$('#callWindow');
+  if(!b){b=document.createElement('div');b.id='callWindow';b.className='call-window glass';document.body.append(b)}
+  b.innerHTML='<div class="call-head"><b>'+(mode==='video'?'ビデオ通話':'音声通話')+'</b><button onclick="endCall()">×</button></div><div id="callStage" class="call-stage">'+(mode==='video'?'<video id="localVideo" autoplay muted playsinline></video>':'<div class="call-avatar">☎</div>')+'<audio id="remoteAudio" autoplay></audio></div><div class="call-controls"><button class="call-end" onclick="endCall()">通話を終了</button></div>';
+  if(mode==='video'&&stream&&$('#localVideo'))$('#localVideo').srcObject=stream;
+}
+async function handleCallSignal(x){
+  if(x.action==='offer'){
+    if(novaCallId&&novaCallId!==x.callId)return;
+    if(!confirm('着信があります。通話に出ますか？')){sendCallSignal(x.fromUserId,{action:'reject',callId:x.callId});return}
+    try{
+      novaCallId=x.callId;novaMode=x.mode;novaTarget=x.fromUserId;
+      novaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:x.mode==='video'});
+      showCall(x.mode,novaStream);
+      const pc=createCallPeer(x.fromUserId,false);
+      await pc.setRemoteDescription(x.offer);
+      const ans=await pc.createAnswer();await pc.setLocalDescription(ans);
+      sendCallSignal(x.fromUserId,{action:'answer',callId:x.callId,answer:pc.localDescription});
+      if(!novaTargets.includes(x.fromUserId))novaTargets.push(x.fromUserId);
+    }catch{endCall(false)}
+  }else if(x.action==='answer'){
+    if(x.callId!==novaCallId)return;
+    const pc=novaPeers[peerKey(x.fromUserId)];if(pc)await pc.setRemoteDescription(x.answer);
+  }else if(x.action==='ice'){
+    if(x.callId!==novaCallId)return;
+    const pc=novaPeers[peerKey(x.fromUserId)];if(pc)pc.addIceCandidate(x.candidate).catch(()=>{});
+  }else if(x.action==='reject'){toast('相手が応答しませんでした')}
+  else if(x.action==='hangup'){removeRemoteStream(x.fromUserId);if(Object.keys(novaPeers).length<=1)endCall(false)}
+}
+function endCall(notify=true){
+  if(notify&&novaTargets.length)novaTargets.forEach(id=>sendCallSignal(id,{action:'hangup',callId:novaCallId}));
+  Object.values(novaPeers).forEach(pc=>pc.close());
+  novaPeers={};novaStream?.getTracks().forEach(t=>t.stop());novaStream=null;novaTargets=[];novaCallId=null;novaMode=null;novaRoomKey=null;$('#callWindow')?.remove()
+}
 async function sendCurrentChat(e,extra={}){
   if(e)e.preventDefault();
   const text=String($('#chatText')?.value||e?.target?.text?.value||'').trim();
