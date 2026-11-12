@@ -280,7 +280,7 @@ async function home(m){
 }
 let chatRoom='class';
 let chatTarget=null;
-async async function chat(m){
+async function chat(m){
   wsConnect();
   const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN'].includes(me.role))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
