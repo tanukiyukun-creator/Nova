@@ -6,7 +6,7 @@ const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function toast(x){const d=document.createElement('div');d.className='toast';d.textContent=x;document.body.append(d);setTimeout(()=>d.remove(),2600)}
 function setSession(x){me=x.user;persistUser(me);localStorage.novaToken=x.token}
 function logout(){localStorage.removeItem('novaUser');localStorage.removeItem('novaToken');me=null;render()}
-async function render(skipAuthRefresh=false){if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&me.role==='SUPER_ADMIN')return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><span>N</span><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他'],...(me.role==='SUPER_ADMIN'?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',settings:'その他'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':'N'}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
+async function render(skipAuthRefresh=false){if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&hasClientRole('SUPER_ADMIN'))return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><span>N</span><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他'],...(hasClientRole('SUPER_ADMIN')?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',settings:'その他'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':'N'}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
 async function renderSuperAdmin(){
   let state={users:[],schools:[],messages:[],friends:[],posts:[],events:[],tasks:[],schedules:[],elections:[],notifications:[],calls:[]};
   try{state=await api('/api/debug/state')}catch(x){document.body.innerHTML=`<div class="auth premium-auth"><div class="authbox glass"><div class="auth-logo"><span>N</span><div>NOVA<small>SYSTEM ADMIN</small></div></div><div class="auth-hero"><small>SUPER ADMIN</small><h1>管理画面を開けませんでした</h1><p>${esc(x.message||'認証セッションを確認してください')}</p><button class="btn alt" onclick="logout()">通常ログインへ</button></div></div></div>`;return}
@@ -493,7 +493,7 @@ function endCall(notify=true){
 }
 async function sendCurrentChat(e,extra={}){
   if(e)e.preventDefault();
-  const text=String($('#chatText')?.value||e?.target?.text?.value||'').trim();
+  const text=String($('#chatText')?.value||((e?.target instanceof HTMLFormElement)?new FormData(e.target).get('text'):'')||'').trim();
   if(!text&&!extra.image&&!extra.sticker)return;
   const body={text,...extra,replyTo:window.novaReply||null};
   try{
@@ -533,7 +533,37 @@ async function sendClassMsg(e){
 }
 async function schoolGrade(){view='school';const m=$('#main');const p=await api('/api/posts?kind=grade');m.innerHTML=`<div class="glass card"><div class="h">GRADE BOARD</div>${p.map(x=>`<div class="item"><b>${esc(x.title)}</b><p>${esc(x.body)}</p></div>`).join('')||'<p class="sub">投稿はありません</p>'}</div>`}async function schoolSchool(){const p=await api('/api/posts?kind=school');$('#main').innerHTML=`<div class="glass card"><div class="h">SCHOOL BOARD</div>${p.map(x=>`<div class="item"><b>${esc(x.title)}</b><p>${esc(x.body)}</p></div>`).join('')||'<p class="sub">投稿はありません</p>'}</div>`}
 async function vote(e,c){try{await api('/api/elections/'+e+'/vote',{method:'POST',body:JSON.stringify({candidateId:c})});toast('投票しました');school($('#main'))}catch(x){toast(x.message)}}
-async function adminPanel(){const admins=await api('/api/admins');$('#main').innerHTML=`<div class="grid"><section class="glass card span6"><div class="h">ADMINISTRATORS</div>${admins.map(a=>`<div class="item row"><div class="avatar">${esc(a.icon)}</div><div><b>${esc(a.displayName)}</b><div class="sub">${esc(a.role)}</div></div></div>`).join('')||'<p class="sub">管理者はいません</p>'}</section><section class="glass card span6"><div class="h">ELECTION START</div><p class="sub">候補者を選んで管理者選挙を開始します。</p><button class="btn alt" onclick="startElection('CLASS_ADMIN')">CLASS_ADMIN選挙</button><button class="btn alt" onclick="startElection('GRADE_ADMIN')">GRADE_ADMIN選挙</button><button class="btn alt" onclick="startElection('SCHOOL_ADMIN')">SCHOOL_ADMIN選挙</button></section></div>`}async function startElection(type){const us=await api('/api/users/search?q=');const ids=us.slice(0,5).map(x=>x.id);try{await api('/api/elections',{method:'POST',body:JSON.stringify({type,candidateIds:ids})});toast('選挙を開始しました');school($('#main'))}catch(x){toast(x.message)}}
+async function adminPanel(){
+  const admins=await api('/api/admins');
+  const canSuper=hasClientRole('SUPER_ADMIN');
+  const canSchool=hasClientRole('SCHOOL_ADMIN')||canSuper;
+  const canManage=canSchool||hasClientRole('GRADE_ADMIN')||hasClientRole('CLASS_ADMIN');
+  $('#main').innerHTML=`<div class="grid">
+    <section class="glass card span12">
+      <div class="h">ADMIN CONTROL</div>
+      <p class="sub">現在の権限で実行できる管理機能です。</p>
+      <div class="row">
+        ${canManage?'<button class="btn alt" onclick="scheduleView(\$('#main\'))">時間割・授業変更</button>':''}
+        ${canManage?'<button class="btn alt" onclick="createTaskPrompt()">課題を追加</button>':''}
+        ${canSchool?'<button class="btn alt" onclick="createEventPrompt()">学校行事を追加</button>':''}
+        ${canSchool?'<button class="btn alt" onclick="settings(\$('#main\'))">学校・生徒管理</button>':''}
+        ${canSuper?'<button class="btn alt" onclick="go(\'superadmin\')">SUPER ADMIN画面</button>':''}
+      </div>
+    </section>
+    <section class="glass card span6">
+      <div class="h">ADMINISTRATORS</div>
+      ${admins.map(a=>`<div class="item row"><div class="avatar">${a.icon?'<img class="avatar" src="'+esc(a.icon)+'">':'N'}</div><div><b>${esc(a.displayName)}</b><div class="sub">${esc([a.role||'STUDENT',...(Array.isArray(a.adminRoles)?a.adminRoles:[])].filter((v,i,x)=>x.indexOf(v)===i).join(' / '))}</div></div></div>`).join('')||'<p class="sub">管理者はいません</p>'}
+    </section>
+    <section class="glass card span6">
+      <div class="h">ELECTION START</div>
+      <p class="sub">管理者選挙を開始できます。</p>
+      ${hasClientRole('CLASS_ADMIN')||canSchool||hasClientRole('GRADE_ADMIN')?'<button class="btn alt" onclick="startElection(\'CLASS_ADMIN\')">CLASS_ADMIN選挙</button>':''}
+      ${hasClientRole('GRADE_ADMIN')||canSchool?'<button class="btn alt" onclick="startElection(\'GRADE_ADMIN\')">GRADE_ADMIN選挙</button>':''}
+      ${hasClientRole('GRADE_ADMIN')||canSuper?'<button class="btn alt" onclick="startElection(\'SCHOOL_ADMIN\')">SCHOOL_ADMIN選挙</button>':''}
+    </section>
+  </div>`;
+}
+async function startElection(type){const us=await api('/api/users/search?q=');const ids=us.slice(0,5).map(x=>x.id);try{await api('/api/elections',{method:'POST',body:JSON.stringify({type,candidateIds:ids})});toast('選挙を開始しました');school($('#main'))}catch(x){toast(x.message)}}
 async function people(m){const f=await api('/api/friends');m.innerHTML=`<div class="glass card"><div class="row"><input id="uq" class="input" placeholder="友達を検索" oninput="searchUsers()"></div><div id="users" class="list">${f.map(x=>userRow(x,false)).join('')}</div></div>`}function userRow(u,friend=true){return `<div class="item row"><div class="avatar">${esc(u.icon)}</div><div style="flex:1"><b>${esc(u.displayName)}</b><div class="sub">${esc(u.schoolName)} / ${esc(u.grade)}年${esc(u.className)}</div></div>${friend?'':'<button class="btn alt" onclick="addFriend(\''+u.id+'\')">追加</button>'}</div>`}async function searchUsers(){const q=$('#uq').value;const us=await api('/api/users/search?q='+encodeURIComponent(q));$('#users').innerHTML=us.map(x=>userRow(x,false)).join('')||'<p class="sub">見つかりません</p>'}async function addFriend(id2){await api('/api/friends/'+id2,{method:'POST'});toast('友達に追加しました');people($('#main'))}
 async function study(m){
   books=await api('/api/study/books');
@@ -547,10 +577,19 @@ async function study(m){
 async function openStudySetup(id2,name,pth){
   let entries=window.NOVA_BOOKS?.[id2];
   if(!entries){
-    const r=await fetch(pth); const text=await r.text(); entries=parseBook(id2,text);
-    window.NOVA_BOOKS=window.NOVA_BOOKS||{}; window.NOVA_BOOKS[id2]=entries;
+    try{
+      const r=await fetch(pth,{cache:'no-store'});
+      if(!r.ok)throw new Error('HTTP '+r.status+' / '+pth);
+      const text=await r.text();
+      entries=parseBook(id2,text);
+      if(!entries.length)throw new Error('データを解析できませんでした');
+      window.NOVA_BOOKS=window.NOVA_BOOKS||{};
+      window.NOVA_BOOKS[id2]=entries;
+    }catch(e){
+      return toast('単語データを読み込めませんでした: '+(e.message||'不明なエラー'));
+    }
   }
-  if(!entries.length)return toast('単語データを読み込めませんでした');
+  if(!entries.length)return toast('単語データが空です');
   const max=entries.length;
   $('#main').innerHTML=`<div class="study-setup">
     <section class="glass card">
@@ -579,22 +618,34 @@ function parseStudyRanges(raw,max){
   return [...new Set(out)];
 }
 function parseBook(id2,t){
-  const lines=t.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  const lines=String(t||'').replace(/^\uFEFF/,'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(id2==='irohani'){
     const out=[];
     for(let i=0;i<lines.length;i++){
-      if(lines[i].startsWith('【')||/^\\d+/.test(lines[i]))continue;
-      let a='';
-      for(let j=i+1;j<Math.min(i+6,lines.length);j++)if(lines[j].startsWith('【KEY】')){a=lines[j].replace('【KEY】','').trim();break}
-      if(a)out.push({no:out.length+1,q:lines[i],a,type:'jp'});
+      const head=lines[i];
+      if(head.startsWith('【')||/^\d+/.test(head)||/^[①-⑳]/.test(head))continue;
+      let answer='';
+      for(let j=i+1;j<Math.min(i+8,lines.length);j++){
+        if(lines[j].startsWith('【KEY】')){
+          answer=lines[j].replace(/^【KEY】/,'').trim();
+          break;
+        }
+        if(lines[j].startsWith('【')||(!/^[①-⑳]/.test(lines[j])&&j>i+1))break;
+      }
+      if(answer)out.push({no:out.length+1,q:head,a:answer,type:'jp'});
     }
     return out;
   }
   const out=[];
-  for(const l of lines){
-    const m=l.match(/^(\d+)[\t ]+(.+?)[\t ]{2,}(.+)$/);
-    if(m)out.push({no:Number(m[1]),q:m[2].trim(),a:m[3].trim(),type:'en'});
-    else {const m2=l.match(/^(\d+)[\t ]+([^\t ]+)[\t ]+(.+)$/);if(m2)out.push({no:Number(m2[1]),q:m2[2].trim(),a:m2[3].trim(),type:'en'})}
+  for(const line of lines){
+    if(/^(英単語|No\.?|\d+\/\d+)$/.test(line))continue;
+    let m=line.match(/^(\d+)\s+(.+?)\s{2,}(.+)$/);
+    if(!m)m=line.match(/^(\d+)\t(.+?)\t(.+)$/);
+    if(!m)m=line.match(/^(\d+)\s+([^\s]+)\s+(.+)$/);
+    if(m){
+      const no=Number(m[1]);
+      if(Number.isFinite(no))out.push({no,q:m[2].trim(),a:m[3].trim(),type:'en'});
+    }
   }
   return out;
 }
