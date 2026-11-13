@@ -266,7 +266,7 @@ app.get('/api/talks/:room',auth,(req,res)=>{
   if(!['school','class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
   const db=load(),talk=ensureTalk(db,req.user,room);
   const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>({...m,fromName:db.users.find(u=>u.id===m.from)?.displayName||'メンバー'}));
-  save(db);res.json({talk,messages});
+  res.json({talk,messages});
 });
 app.post('/api/talks/:room/messages',auth,(req,res)=>{
   const room=String(req.params.room);if(!['school','class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
@@ -275,7 +275,7 @@ app.post('/api/talks/:room/messages',auth,(req,res)=>{
   const text=String(req.body.text||'').trim();if(!text)return res.status(400).json({error:'メッセージを入力してください'});
   const m=buildMessage(req,req.user.id,null,talk.id,'group');
   db.messages.push(m);talk.memberIds.filter(x=>x!==req.user.id).forEach(uid=>notify(db,uid,'group_message',talk.name,`${req.user.displayName}からメッセージが届きました`));
-  save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:m,talkId:talk.id}))});res.json(m);
+  save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:{...m,fromName:req.user.displayName},talkId:talk.id}))});res.json({...m,fromName:req.user.displayName});
 });
 function scope(req){return {schoolId:req.user.schoolId,grade:req.user.grade,className:req.user.className}}
 app.get('/api/class',auth,(req,res)=>{
