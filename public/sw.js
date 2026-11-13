@@ -5,6 +5,11 @@ self.addEventListener('fetch',event=>{
   const u=new URL(event.request.url);
   if(u.origin!==location.origin)return;
   if(event.request.method!=='GET')return;
+  // Never cache API responses: authentication and user-specific data must always be fetched fresh.
+  if(u.pathname.startsWith('/api/')){
+    event.respondWith(fetch(event.request,{cache:'no-store'}));
+    return;
+  }
   if(['/app.js','/styles.css','/index.html','/'].includes(u.pathname)){
     event.respondWith(fetch(event.request,{cache:'no-store'}).catch(()=>caches.match(event.request)));
     return;
