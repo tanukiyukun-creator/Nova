@@ -41,7 +41,7 @@ async function renderSuperAdmin(){
   window.NOVA_SUPER_STATE=state;
   superSection('overview');
 }
-async async function hasRoleForAdminUI(u,role){return u?.role===role||Array.isArray(u?.adminRoles)&&u.adminRoles.includes(role)}
+function hasRoleForAdminUI(u,role){return u?.role===role||Array.isArray(u?.adminRoles)&&u.adminRoles.includes(role)}
 async function superBan(id){
   const reason=prompt('BAN理由を入力してください（任意）','Novaの利用規約違反');
   if(reason===null)return;
