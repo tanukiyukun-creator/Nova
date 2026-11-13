@@ -20,9 +20,12 @@ async function renderSuperAdmin(){
         <div class="super-account"><div class="super-avatar">N</div><div><b>SUPER ADMIN</b><small>Nova System</small></div></div>
         <nav>
           <button class="super-nav active" onclick="superSection('overview',this)">◈ <span>概要</span></button>
-          <button class="super-nav" onclick="superSection('users',this)">♙ <span>ユーザー</span></button>
-          <button class="super-nav" onclick="superSection('schools',this)">▦ <span>学校</span></button>
-          <button class="super-nav" onclick="superSection('admins',this)">♜ <span>管理者</span></button>
+          <button class="super-nav" onclick="superSection('users',this)">♙ <span>ユーザー管理</span></button>
+          <button class="super-nav" onclick="superSection('permissions',this)">♜ <span>権限管理</span></button>
+          <button class="super-nav" onclick="superSection('elections',this)">◇ <span>管理者選出</span></button>
+          <button class="super-nav" onclick="superSection('schools',this)">▦ <span>学校管理</span></button>
+          <button class="super-nav" onclick="superSection('content',this)">▤ <span>コンテンツ管理</span></button>
+          <button class="super-nav" onclick="superSection('safety',this)">⚠ <span>通報・安全管理</span></button>
           <button class="super-nav" onclick="superSection('system',this)">⚙ <span>システム</span></button>
         </nav>
         <div class="super-side-bottom"><button onclick="go('home')">← Novaへ戻る</button><button onclick="logout()">↪ ログアウト</button></div>
@@ -61,7 +64,7 @@ function superSection(section,btn){
   if(btn)btn.classList.add('active');
   const state=window.NOVA_SUPER_STATE||{};
   const users=state.users||[],schools=state.schools||[];
-  const titles={overview:'管理者ダッシュボード',users:'ユーザー管理',schools:'学校管理',admins:'管理者管理',system:'システム'};
+  const titles={overview:'管理者ダッシュボード',users:'ユーザー管理',permissions:'権限管理',elections:'管理者選出',schools:'学校管理',content:'コンテンツ管理',safety:'通報・安全管理',system:'システム'};
   const title=$('#superTitle');if(title)title.textContent=titles[section]||titles.overview;
   const c=$('#superContent');if(!c)return;
   if(section==='overview'){
@@ -96,6 +99,63 @@ function superSection(section,btn){
       </div>`;
   }else if(section==='users'){
     c.innerHTML=`<section class="glass super-card"><div class="super-card-head"><div><small>USER DIRECTORY</small><h3>全ユーザー</h3></div><span class="super-count">${users.length} USERS</span></div><div class="super-table-wrap"><table class="super-table"><thead><tr><th>ユーザー</th><th>学校</th><th>所属</th><th>権限</th><th>状態</th><th>操作</th></tr></thead><tbody>${users.map(u=>`<tr><td><div class="table-user"><div class="super-mini-avatar">${u.icon?'<img src="'+esc(u.icon)+'">':'N'}</div><b>${esc(u.displayName)}</b></div></td><td>${esc(u.schoolName)}</td><td>${esc(u.grade)}年 ${esc(u.className)}組 / ${esc(u.attendanceNo)}</td><td><span class="role-pill ${esc(String(u.role||'STUDENT').toLowerCase())}">${esc([u.role||'STUDENT',...(Array.isArray(u.adminRoles)?u.adminRoles:[])].filter((v,i,a)=>a.indexOf(v)===i).join(' / '))}</span></td><td><span class="status-pill ${u.banned?'banned':'active'}">${u.banned?'BAN':'ACTIVE'}</span></td><td><button class="ban-btn" onclick="superRolePrompt(${JSON.stringify(u.id)})">権限変更</button> ${u.role==='SUPER_ADMIN'?'<span class="protected-label">保護</span>':u.banned?`<button class="ban-btn unban" onclick="superUnban(${JSON.stringify(u.id)})">BAN解除</button>`:`<button class="ban-btn" onclick="superBan(${JSON.stringify(u.id)})">アカウントBAN</button>`}</td></tr>`).join('')}</tbody></table></div></section>`;
+  }else if(section==='permissions'){
+    const admins=users.filter(u=>(u.role&&u.role!=='STUDENT')||(Array.isArray(u.adminRoles)&&u.adminRoles.length));
+    const counts=['SUPER_ADMIN','SCHOOL_ADMIN','GRADE_ADMIN','CLASS_ADMIN'].map(r=>({r,n:admins.filter(u=>u.role===r||(Array.isArray(u.adminRoles)&&u.adminRoles.includes(r))).length}));
+    c.innerHTML=`<div class="super-grid">
+      <section class="glass super-card span4"><div class="super-card-head"><div><small>PERMISSION CONTROL</small><h3>権限管理</h3></div><span class="super-count">${admins.length} ADMINS</span></div>
+        ${counts.map(x=>`<div class="role-row"><b>${x.r}</b><span>${x.n}</span></div>`).join('')}
+        <p class="system-copy">ユーザーごとに複数の管理権限を設定できます。権限の付与・変更・剥奪はユーザー一覧から行います。</p>
+      </section>
+      <section class="glass super-card span4"><div class="super-card-head"><div><small>ADMIN SCOPE</small><h3>管理範囲</h3></div></div>
+        <div class="permission-note"><b>CLASS_ADMIN</b><p>所属する学校・学年・クラスを管理。</p></div>
+        <div class="permission-note"><b>GRADE_ADMIN</b><p>所属する学校・学年を管理。</p></div>
+        <div class="permission-note"><b>SCHOOL_ADMIN</b><p>所属する学校全体を管理。</p></div>
+        <div class="permission-note"><b>SUPER_ADMIN</b><p>Nova全体を管理。</p></div>
+      </section>
+    </div>`;
+  }else if(section==='elections'){
+    const elections=state.elections||[];
+    c.innerHTML=`<div class="super-grid">
+      <section class="glass super-card span4"><div class="super-card-head"><div><small>ELECTIONS</small><h3>管理者選出</h3></div><span class="super-count">${elections.length} RECORDS</span></div>
+        <div class="permission-note"><b>CLASS_ADMIN</b><p>クラス内の生徒を対象に選出。</p></div>
+        <div class="permission-note"><b>GRADE_ADMIN</b><p>学年内のCLASS_ADMINを対象に選出。</p></div>
+        <div class="permission-note"><b>SCHOOL_ADMIN</b><p>学校内のGRADE_ADMINを対象に選出。</p></div>
+        <p class="system-copy">投票は24時間。自分自身への投票は不可。過半数到達、または最多得票で決定し、同率1位は全員が選出されます。</p>
+      </section>
+      <section class="glass super-card span4"><div class="super-card-head"><div><small>REELECTION</small><h3>再選・欠員</h3></div></div>
+        <div class="permission-note"><b>再選要求</b><p>一般ユーザーの30%以上の要求で再選を開始。</p></div>
+        <div class="permission-note"><b>管理者離脱</b><p>管理者が離脱・権限剥奪された場合は必要な再選を自動開始。</p></div>
+      </section>
+    </div>`;
+  }else if(section==='content'){
+    c.innerHTML=`<div class="super-grid">
+      <section class="glass super-card span4"><div class="super-card-head"><div><small>CONTENT</small><h3>コンテンツ管理</h3></div></div>
+        <div class="data-grid">
+          <div><b>${(state.posts||[]).length}</b><span>掲示板投稿</span></div>
+          <div><b>${(state.events||[]).length}</b><span>行事</span></div>
+          <div><b>${(state.tasks||[]).length}</b><span>課題</span></div>
+          <div><b>${(state.schedules||[]).length}</b><span>時間割</span></div>
+        </div>
+        <p class="system-copy">実際の編集操作は、対象となるクラス・学年・学校の管理画面から行います。</p>
+      </section>
+      <section class="glass super-card span4"><div class="super-card-head"><div><small>LEARNING</small><h3>学習コンテンツ</h3></div></div>
+        <div class="permission-note"><b>単語帳</b><p>ターゲット1200・ターゲット1900・鉄壁・いろはにほへと古文単語。</p></div>
+        <div class="permission-note"><b>学習機能</b><p>4択・入力・フラッシュカード・リスニング・ディクテーションなど。</p></div>
+      </section>
+    </div>`;
+  }else if(section==='safety'){
+    const banned=users.filter(u=>u.banned);
+    c.innerHTML=`<div class="super-grid">
+      <section class="glass super-card span4"><div class="super-card-head"><div><small>SAFETY</small><h3>通報・安全管理</h3></div><span class="super-count">${banned.length} BANNED</span></div>
+        <div class="permission-note"><b>アカウント停止</b><p>規約違反などが確認されたアカウントを停止・解除できます。</p></div>
+        <div class="permission-note"><b>クラスからの退出</b><p>不正な所属や荒らしなど、クラス管理上の問題に対応します。</p></div>
+        <div class="permission-note"><b>上位管理者への報告</b><p>CLASS_ADMINで対応できない問題はGRADE_ADMIN、SCHOOL_ADMINへエスカレーションします。</p></div>
+      </section>
+      <section class="glass super-card span4"><div class="super-card-head"><div><small>BANNED USERS</small><h3>利用停止中のユーザー</h3></div></div>
+        ${banned.slice(0,20).map(u=>`<div class="super-user-row"><div class="super-mini-avatar">${u.icon?'<img src="'+esc(u.icon)+'">':'N'}</div><div><b>${esc(u.displayName)}</b><small>${esc(u.schoolName)} · ${esc(u.banReason||'理由未設定')}</small></div><button class="ban-btn unban" onclick="superUnban(${JSON.stringify(u.id)})">BAN解除</button></div>`).join('')||'<div class="super-empty">利用停止中のユーザーはいません</div>'}
+      </section>
+    </div>`;
   }else if(section==='schools'){
     c.innerHTML=`<section class="glass super-card"><div class="super-card-head"><div><small>SCHOOL DIRECTORY</small><h3>登録学校</h3></div><span class="super-count">${schools.length} SCHOOLS</span></div><div class="school-admin-grid">${schools.map(s=>{const n=users.filter(u=>u.schoolId===s.id).length;return `<div class="school-admin-card"><div class="school-mark">N</div><div><b>${esc(s.name)}</b><span>${n} users</span></div><i>›</i></div>`}).join('')||'<div class="super-empty">登録学校はありません</div>'}</div></section>`;
   }else if(section==='admins'){
