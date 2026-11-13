@@ -603,3 +603,5 @@ button:active,.btn:active{transform:scale(.98)}
 @media(max-width:800px){
   .line-messages .bubble-row{max-width:94%}
 }
+
+.nova-brand-icon{width:34px;height:34px;display:block;object-fit:cover;border-radius:10px}.logo>.nova-brand-icon{width:40px;height:40px;border-radius:12px}.super-brand>.nova-brand-icon{width:40px;height:40px;border-radius:12px}.auth-logo>.nova-brand-icon{width:44px;height:44px;border-radius:13px}.super-avatar .nova-brand-icon,.school-mark .nova-brand-icon{width:100%;height:100%;border-radius:inherit}.study-book-mark .nova-brand-icon{width:42px;height:42px;border-radius:12px}.avatar>.nova-brand-icon{width:100%;height:100%;border-radius:inherit;object-fit:cover}
