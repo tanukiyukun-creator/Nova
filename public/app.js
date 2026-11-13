@@ -363,7 +363,7 @@ async function home(m){
 }
 let chatRoom='class';
 let chatTarget=null;
-async function chat(m){
+async async function chat(m){
   wsConnect();
   const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(hasClientRole('CLASS_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
@@ -568,7 +568,7 @@ function endCall(notify=true){
   Object.values(novaPeers).forEach(pc=>pc.close());
   novaPeers={};novaStream?.getTracks().forEach(t=>t.stop());novaStream=null;novaTargets=[];novaCallId=null;novaMode=null;novaRoomKey=null;$('#callWindow')?.remove()
 }
-async function sendCurrentChat(e,extra={}){
+async async function sendCurrentChat(e,extra={}){
   if(e)e.preventDefault();
   const input=$('#chatText');
   const text=String(input?.value||((e?.target instanceof HTMLFormElement)?new FormData(e.target).get('text'):'')||'').trim();
