@@ -166,7 +166,7 @@ function superSection(section,btn){
     c.innerHTML=`<section class="glass super-card"><div class="super-card-head"><div><small>SCHOOL DIRECTORY</small><h3>登録学校</h3></div><span class="super-count">${schools.length} SCHOOLS</span></div><div class="school-admin-grid">${schools.map(s=>{const n=users.filter(u=>u.schoolId===s.id).length;return `<div class="school-admin-card"><div class="school-mark">${schoolIconHtml()}</div><div><b>${esc(s.name)}</b><span>${n} users</span></div><i>›</i></div>`}).join('')||'<div class="super-empty">登録学校はありません</div>'}</div></section>`;
   }else if(section==='admins'){
     const admins=users.filter(u=>(u.role&&u.role!=='STUDENT')||(Array.isArray(u.adminRoles)&&u.adminRoles.length));
-    c.innerHTML=`<div class="super-grid"><section class="glass super-card span2"><div class="super-card-head"><div><small>ADMINISTRATORS</small><h3>現在の管理者</h3></div></div>${admins.map(u=>`<div class="super-user-row admin-row"><div class="super-mini-avatar">${u.icon?'<img src="'+esc(u.icon)+'">':novaIconHtml()}</div><div><b>${esc(u.displayName)}</b><small>${esc(u.schoolName)} · ${esc(u.grade)}年 ${esc(u.className)}組</small></div><em>${esc(u.role)}</em></div>`).join('')||'<div class="super-empty">管理者はいません</div>'}</section><section class="glass super-card span2"><div class="super-card-head"><div><small>CONTROL</small><h3>SUPER ADMIN権限</h3></div></div><div class="permission-note"><b>Nova全体</b><p>学校・ユーザー・管理者・学習・掲示板・行事など、システム全体を監督できます。</p></div><div class="permission-note"><b>選挙</b><p>各学校・学年・クラスの管理者選出状況を確認し、必要に応じて再選挙を開始できます。</p></div></section></div>`;
+    c.innerHTML=`<div class="super-grid"><section class="glass super-card span2"><div class="super-card-head"><div><small>ADMINISTRATORS</small><h3>現在の管理者</h3></div></div>${admins.map(u=>`<div class="super-user-row admin-row"><div class="super-mini-avatar">${u.icon?'<img src="'+esc(u.icon)+'">':profileFallbackHtml()}</div><div><b>${esc(u.displayName)}</b><small>${esc(u.schoolName)} · ${esc(u.grade)}年 ${esc(u.className)}組</small></div><em>${esc(u.role)}</em></div>`).join('')||'<div class="super-empty">管理者はいません</div>'}</section><section class="glass super-card span2"><div class="super-card-head"><div><small>CONTROL</small><h3>SUPER ADMIN権限</h3></div></div><div class="permission-note"><b>Nova全体</b><p>学校・ユーザー・管理者・学習・掲示板・行事など、システム全体を監督できます。</p></div><div class="permission-note"><b>選挙</b><p>各学校・学年・クラスの管理者選出状況を確認し、必要に応じて再選挙を開始できます。</p></div></section></div>`;
   }else{
     c.innerHTML=`<div class="super-grid"><section class="glass super-card span2"><div class="super-card-head"><div><small>SYSTEM</small><h3>システム情報</h3></div></div><div class="system-line"><span>サービス</span><b>Nova</b></div><div class="system-line"><span>権限</span><b>SUPER_ADMIN</b></div><div class="system-line"><span>認証</span><b>管理パスワード</b></div><div class="system-line"><span>データベース</span><b>JSON</b></div></section><section class="glass super-card span2"><div class="super-card-head"><div><small>SAFETY</small><h3>重要事項</h3></div></div><p class="system-copy">SUPER ADMINの操作はNova全体に影響します。ユーザーのプライベートな1対1チャットを通常の管理対象として閲覧する設計にはしません。</p><p class="system-copy">管理パスワードはGitHubへ保存せず、サーバー環境変数で管理します。</p></section></div>`;
   }
@@ -336,7 +336,7 @@ async function home(m){
   m.innerHTML=`<div class="nova-home nova-home-compact">
     <section class="home-head glass">
       <div><div class="eyebrow">NOVA · SCHOOL LIFE</div><div class="home-date-line"><strong>${dateText}</strong><span>${weekday}</span></div><div id="homeClock" class="home-clock"></div></div>
-      <div class="home-head-profile"><div class="avatar">${me.icon?'<img src="'+esc(me.icon)+'">':novaIconHtml()}</div><div><b>${esc(me.lastName||'')} ${esc(me.firstName||'')}</b><small>${esc(me.grade)}年 · ${esc(me.className)}組</small></div></div>
+      <div class="home-head-profile"><div class="avatar">${me.icon?'<img src="'+esc(me.icon)+'">':profileFallbackHtml()}</div><div><b>${esc(me.lastName||'')} ${esc(me.firstName||'')}</b><small>${esc(me.grade)}年 · ${esc(me.className)}組</small></div></div>
     </section>
     <section class="home-card glass home-schedule-card">
       <div class="compact-card-head">
@@ -979,7 +979,7 @@ async function settings(m){
       <section class="glass card settings-card">
         <div class="settings-card-title"><b>アカウント</b><span>基本情報</span></div>
         <div class="settings-avatar-row">
-          <div class="avatar settings-avatar">${me.icon?'<img src="'+esc(me.icon)+'">':novaIconHtml()}</div>
+          <div class="avatar settings-avatar">${me.icon?'<img src="'+esc(me.icon)+'">':profileFallbackHtml()}</div>
           <label class="btn alt photo-btn">アイコン写真を変更<input id="settingsIconFile" type="file" accept="image/*" hidden onchange="settingsPhoto(event)"></label>
         </div>
         <div class="settings-grid">
