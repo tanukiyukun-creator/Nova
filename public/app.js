@@ -455,7 +455,7 @@ async function groupChatHtml(room,fallbackMessage=null){
   }else{
     data=await api('/api/talks/'+encodeURIComponent(room));
   }
-  const messages=Array.isArray(data?.messages)?[...data.messages]:[];if(fallbackMessage&&fallbackMessage.id&&!messages.some(x=>x.id===fallbackMessage.id))messages.push(fallbackMessage);
+  const messages=mergeChatMessages(room,data?.messages,fallbackMessage);
   try{if(room==='friend'&&chatTarget)await api('/api/chats/'+encodeURIComponent(chatTarget)+'/read',{method:'POST'});else if(room==='class'||room==='classadmin'||room==='gradeadmin')await api('/api/talks/'+encodeURIComponent(room)+'/read',{method:'POST'});else if(room.startsWith('group:'))await api('/api/groups/'+encodeURIComponent(room.slice(6))+'/read',{method:'POST'})}catch{}
   let html=messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
   if(room==='classadmin'||room==='gradeadmin'){
@@ -607,19 +607,37 @@ async function sendCurrentChat(e,extra={}){
     // 直前まで表示されていたメッセージが消えることがある。送信成功時は現在の画面へ
     // サーバーが返したメッセージだけをID単位で追加し、履歴の再描画は行わない。
     const box=$('#chatbox');
-    if(box&&sent?.id&&!box.querySelector('[data-message-id="'+CSS.escape(String(sent.id))+'"]')){
-      const empty=box.querySelector('.chat-empty-state');
-      if(empty)box.innerHTML=messageBubble(sent);
-      else box.insertAdjacentHTML('beforeend',messageBubble(sent));
-      box.scrollTop=box.scrollHeight;
+    if(sent?.id){
+      const cacheRoom=chatRoom==='friend'&&chatTarget?'friend:'+chatTarget:chatRoom;
+      const cached=mergeChatMessages(cacheRoom,[],sent);
+      if(box&&!box.querySelector('[data-message-id="'+CSS.escape(String(sent.id))+'"]')){
+        const empty=box.querySelector('.chat-empty-state');
+        if(empty)box.innerHTML=messageBubble(sent);
+        else box.insertAdjacentHTML('beforeend',messageBubble(sent));
+        box.scrollTop=box.scrollHeight;
+      }
     }
   }catch(x){toast(x?.message||'メッセージを送信できません')}
+}
+function chatCacheKey(room){return 'novaChatCache:'+String(room||'');}
+function readChatCache(room){
+  try{const x=JSON.parse(localStorage.getItem(chatCacheKey(room))||'[]');return Array.isArray(x)?x:[]}catch{return []}
+}
+function writeChatCache(room,messages){
+  try{localStorage.setItem(chatCacheKey(room),JSON.stringify((messages||[]).filter(x=>x&&x.id).slice(-200)))}catch{}
+}
+function mergeChatMessages(room,serverMessages,fallbackMessage=null){
+  const all=[...(Array.isArray(serverMessages)?serverMessages:[]),...readChatCache(room)];
+  if(fallbackMessage?.id)all.push(fallbackMessage);
+  const map=new Map();for(const x of all)if(x?.id)map.set(String(x.id),x);
+  const result=[...map.values()].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).slice(-200);
+  writeChatCache(room,result);
+  return result;
 }
 async function chatHtml(id2,fallbackMessage=null){
   const ms=await api('/api/chats/'+encodeURIComponent(id2));
   try{await api('/api/chats/'+encodeURIComponent(id2)+'/read',{method:'POST'})}catch{}
-  const messages=Array.isArray(ms)?[...ms]:[];
-  if(fallbackMessage&&fallbackMessage.id&&!messages.some(x=>x.id===fallbackMessage.id))messages.push(fallbackMessage);
+  const messages=mergeChatMessages('friend:'+id2,ms,fallbackMessage);
   return messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
 }
 async function school(m){
