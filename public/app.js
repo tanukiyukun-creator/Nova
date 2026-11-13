@@ -491,18 +491,24 @@ function messageBubble(x){
   const deleteButton=mine?'<button type="button" onclick="deleteChatMessage('+JSON.stringify(x.id)+')">削除</button>':'';
   return '<div class="bubble-row '+(mine?'mine':'')+'" data-message-id="'+esc(String(x.id||''))+'"><div class="bubble '+(mine?'mine':'')+'"><div class="message-meta"><b>'+(mine?'あなた':esc(x.fromName||'メンバー'))+'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span>'+readLabel+'</div>'+reply+image+text+'<div class="message-actions"><button type="button" onclick="replyMessage('+JSON.stringify(JSON.stringify({id:x.id,text:x.text||'画像'}))+')">↩ 返信</button>'+deleteButton+'</div></div></div>';
 }
-async function deleteChatMessage(id2){
-  if(!confirm('このメッセージを削除しますか？'))return;
+async async function deleteChatMessage(id2){
+  if(!confirm('このメッセージの送信を取り消しますか？'))return;
   try{
     await api('/api/messages/'+encodeURIComponent(id2)+'/delete',{method:'POST'});
     const box=$('#chatbox');
-    if(box)box.innerHTML=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom);
+    if(box){
+      const row=box.querySelector('[data-message-id="'+CSS.escape(String(id2))+'"]');
+      if(row){
+        const holder=document.createElement('div');
+        holder.innerHTML=messageBubble({id:id2,from:me.id,fromName:me.displayName,createdAt:Date.now(),deleted:true});
+        row.replaceWith(holder.firstElementChild);
+      }
+    }
   }catch(e){toast(e.message)}
 }
 function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
 function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
-function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}if(view!=='chat'||!x.message||!['message','group_message','class_message'].includes(x.type))return;const box=$('#chatbox');if(!box)return;const id=String(x.message.id||'');if(!id||box.querySelector('[data-message-id="'+CSS.escape(id)+'"]'))return;const empty=box.querySelector('.chat-empty-state');if(empty)box.innerHTML=messageBubble(x.message);else box.insertAdjacentHTML('beforeend',messageBubble(x.message));box.scrollTop=box.scrollHeight}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}
-function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
+function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}const box=$('#chatbox');if(x.type==='message_deleted'){if(!box)return;const row=box.querySelector('[data-message-id="'+CSS.escape(String(x.messageId||''))+'"]');if(row){const holder=document.createElement('div');holder.innerHTML=messageBubble(x.deletedMessage||{id:x.messageId,from:me.id,fromName:'メンバー',createdAt:Date.now(),deleted:true});row.replaceWith(holder.firstElementChild)}return}if(view!=='chat'||!x.message||!['message','group_message','class_message'].includes(x.type))return;if(!box)return;const id=String(x.message.id||'');if(!id||box.querySelector('[data-message-id="'+CSS.escape(id)+'"]'))return;const empty=box.querySelector('.chat-empty-state');if(empty)box.innerHTML=messageBubble(x.message);else box.insertAdjacentHTML('beforeend',messageBubble(x.message));box.scrollTop=box.scrollHeight}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
 let novaPeers={},novaStream=null,novaTargets=[],novaMode=null,novaRoomKey=null,novaCallId=null;
 function callScope(){
   if(chatRoom==='friend')return {scope:'friend',ids:chatTarget?[chatTarget]:[]};
