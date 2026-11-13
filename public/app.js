@@ -447,7 +447,7 @@ async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(t
 async function groupChatHtml(room){
   let data;
   if(room==='class'){
-    data=await api('/api/class');
+    data=await api('/api/talks/class');
   }else if(room.startsWith('group:')){
     data=await api('/api/groups/'+encodeURIComponent(room.slice(6)));
   }else{
@@ -580,7 +580,7 @@ async function sendCurrentChat(e,extra={}){
       if(!chatTarget)throw new Error('相手を選択してください');
       sent=await api('/api/chats/'+encodeURIComponent(chatTarget),{method:'POST',body:JSON.stringify(body)});
     }else if(chatRoom==='class'){
-      sent=await api('/api/class/messages',{method:'POST',body:JSON.stringify(body)});
+      sent=await api('/api/talks/class/messages',{method:'POST',body:JSON.stringify(body)});
     }else if(chatRoom.startsWith('group:')){
       sent=await api('/api/groups/'+encodeURIComponent(chatRoom.slice(6))+'/messages',{method:'POST',body:JSON.stringify(body)});
     }else{
