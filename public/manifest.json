@@ -1,1 +1,11 @@
-{"name":"Nova","short_name":"Nova","start_url":"/","display":"standalone","background_color":"#08090d","theme_color":"#0b0c10","icons":[]}
+{
+  "name":"Nova",
+  "short_name":"Nova",
+  "start_url":"/",
+  "display":"standalone",
+  "background_color":"#08090d",
+  "theme_color":"#0b0c10",
+  "icons":[
+    {"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
