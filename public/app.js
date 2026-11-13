@@ -446,7 +446,7 @@ async function startElectionPrompt(room){
 }
 async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
 async function closeMobileChat(){chatTarget=null;chatRoom='';await render(true)}
-async function groupChatHtml(room){
+async function groupChatHtml(room,fallbackMessage=null){
   let data;
   if(room==='class'){
     data=await api('/api/talks/class');
@@ -455,7 +455,7 @@ async function groupChatHtml(room){
   }else{
     data=await api('/api/talks/'+encodeURIComponent(room));
   }
-  const messages=Array.isArray(data?.messages)?data.messages:[];
+  const messages=Array.isArray(data?.messages)?[...data.messages]:[];if(fallbackMessage&&fallbackMessage.id&&!messages.some(x=>x.id===fallbackMessage.id))messages.push(fallbackMessage);
   try{if(room==='friend'&&chatTarget)await api('/api/chats/'+encodeURIComponent(chatTarget)+'/read',{method:'POST'});else if(room==='class'||room==='classadmin'||room==='gradeadmin')await api('/api/talks/'+encodeURIComponent(room)+'/read',{method:'POST'});else if(room.startsWith('group:'))await api('/api/groups/'+encodeURIComponent(room.slice(6))+'/read',{method:'POST'})}catch{}
   let html=messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
   if(room==='classadmin'||room==='gradeadmin'){
@@ -496,12 +496,12 @@ async function deleteChatMessage(id2){
   try{
     await api('/api/messages/'+encodeURIComponent(id2)+'/delete',{method:'POST'});
     const box=$('#chatbox');
-    if(box)box.innerHTML=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom);
+    if(box)box.innerHTML=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom,sent);
   }catch(e){toast(e.message)}
 }
 function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
 function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
-function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if((x.type==='message'||x.type==='group_message'||x.type==='class_message')&&view==='chat')chat($('#main'));if(x.type==='call_signal')handleCallSignal(x)}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}
+function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}if(view==='chat'&&(x.type==='message'||x.type==='group_message'||x.type==='class_message')){const box=$('#chatbox');if(box&&x.message&&!box.querySelector('[data-message-id="'+CSS.escape(String(x.message.id))+'"]')){const empty=box.querySelector('.chat-empty-state');if(empty)box.innerHTML=messageBubble(x.message);else box.insertAdjacentHTML('beforeend',messageBubble(x.message));box.scrollTop=box.scrollHeight}else{chat($('#main'))}}}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}
 function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
 let novaPeers={},novaStream=null,novaTargets=[],novaMode=null,novaRoomKey=null,novaCallId=null;
 function callScope(){
@@ -616,7 +616,7 @@ async function sendCurrentChat(e,extra={}){
       try{
         const html=chatRoom==='friend'&&chatTarget
           ?await chatHtml(chatTarget)
-          :await groupChatHtml(chatRoom);
+          :await groupChatHtml(chatRoom,sent);
         box.innerHTML=html;
         box.scrollTop=box.scrollHeight;
       }catch(e){
