@@ -227,7 +227,7 @@ app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifi
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
 function ensureTalk(db,user,room){
   if(!Array.isArray(db.talks))db.talks=[];
-  let talk=db.talks.find(x=>x.room===room&&x.schoolId===user.schoolId&&(room==='gradeadmin'?true:true));
+  let talk=db.talks.find(x=>x.room===room&&x.schoolId===user.schoolId&&(room==='gradeadmin'?true:(x.grade===user.grade&&x.className===user.className)));
   if(!talk){
     talk={id:id(),room,schoolId:user.schoolId,grade:room==='gradeadmin'?null:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?`${user.grade}年${user.className}組 クラストーク`:room==='school'?'学校トーク':room==='classadmin'?'CLASS ADMIN トーク':'GRADE ADMIN トーク',memberIds:[],createdAt:Date.now()};
     db.talks.push(talk);
