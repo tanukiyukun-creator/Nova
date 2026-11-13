@@ -444,7 +444,7 @@ async function startElectionPrompt(room){
     toast(e.message);
   }
 }
-async async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
+async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
 async function closeMobileChat(){chatTarget=null;chatRoom='';await render(true)}
 async function groupChatHtml(room){
   let data;
@@ -583,7 +583,7 @@ function endCall(notify=true){
   Object.values(novaPeers).forEach(pc=>pc.close());
   novaPeers={};novaStream?.getTracks().forEach(t=>t.stop());novaStream=null;novaTargets=[];novaCallId=null;novaMode=null;novaRoomKey=null;$('#callWindow')?.remove()
 }
-async async function sendCurrentChat(e,extra={}){
+async function sendCurrentChat(e,extra={}){
   if(e)e.preventDefault();
   const input=$('#chatText');
   const text=String(input?.value||((e?.target instanceof HTMLFormElement)?new FormData(e.target).get('text'):'')||'').trim();
