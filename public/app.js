@@ -444,7 +444,7 @@ async function startElectionPrompt(room){
     toast(e.message);
   }
 }
-async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
+async async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
 async function closeMobileChat(){chatTarget=null;chatRoom='';await render(true)}
 async function groupChatHtml(room){
   let data;
@@ -607,6 +607,12 @@ async function sendCurrentChat(e,extra={}){
     // これにより「送信したのに空のトークのまま」を防ぐ。
     const box=$('#chatbox');
     if(box){
+      // 送信成功レスポンスを先に表示して、GET取得失敗でも自分の画面から消えないようにする。
+      const sentHtml=messageBubble(sent);
+      const empty=box.querySelector('.chat-empty-state');
+      if(empty)box.innerHTML=sentHtml;
+      else box.insertAdjacentHTML('beforeend',sentHtml);
+      box.scrollTop=box.scrollHeight;
       try{
         const html=chatRoom==='friend'&&chatTarget
           ?await chatHtml(chatTarget)
@@ -614,8 +620,7 @@ async function sendCurrentChat(e,extra={}){
         box.innerHTML=html;
         box.scrollTop=box.scrollHeight;
       }catch(e){
-        box.innerHTML=messageBubble(sent);
-        box.scrollTop=box.scrollHeight;
+        console.warn('chat refresh failed',e);
       }
     }else{
       await chat($('#main'));
