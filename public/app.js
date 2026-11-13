@@ -488,7 +488,7 @@ function messageBubble(x){
   const image=x.image?'<img class="chat-image" src="'+esc(x.image)+'" onclick="openImage('+JSON.stringify(x.image)+')">':'';
   const text=x.text?'<div class="bubble-text">'+esc(x.text)+'</div>':'';
   const readLabel=mine?'<span class="read-status">'+(read?'既読':'未読')+'</span>':'';
-  const deleteButton=mine?'<button type="button" onclick="deleteChatMessage('+JSON.stringify(x.id)+')">送信取り消し</button>':'';
+  const deleteButton=mine?'<button class="message-cancel-btn" type="button" onclick="deleteChatMessage('+JSON.stringify(x.id)+')">送信取り消し</button>':'';
   return '<div class="bubble-row '+(mine?'mine':'')+'" data-message-id="'+esc(String(x.id||''))+'"><div class="bubble '+(mine?'mine':'')+'"><div class="message-meta"><b>'+(mine?'あなた':esc(x.fromName||'メンバー'))+'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span>'+readLabel+'</div>'+reply+image+text+'<div class="message-actions"><button type="button" onclick="replyMessage('+JSON.stringify(JSON.stringify({id:x.id,text:x.text||'画像'}))+')">↩ 返信</button>'+deleteButton+'</div></div></div>';
 }
 async function deleteChatMessage(id2){
@@ -633,9 +633,18 @@ function writeChatCache(room,messages){
   try{localStorage.setItem(chatCacheKey(room),JSON.stringify((messages||[]).filter(x=>x&&x.id).slice(-200)))}catch{}
 }
 function mergeChatMessages(room,serverMessages,fallbackMessage=null){
-  const all=[...(Array.isArray(serverMessages)?serverMessages:[]),...readChatCache(room)];
-  if(fallbackMessage?.id)all.push(fallbackMessage);
-  const map=new Map();for(const x of all)if(x?.id)map.set(String(x.id),x);
+  // サーバーの最新データを正とし、古いlocalStorageキャッシュで氏名や既読状態を上書きしない。
+  const cache=readChatCache(room);
+  const map=new Map();
+  for(const x of cache)if(x?.id)map.set(String(x.id),x);
+  for(const x of (Array.isArray(serverMessages)?serverMessages:[]))if(x?.id){
+    const key=String(x.id);
+    map.set(key,{...(map.get(key)||{}),...x});
+  }
+  if(fallbackMessage?.id){
+    const key=String(fallbackMessage.id);
+    map.set(key,{...(map.get(key)||{}),...fallbackMessage});
+  }
   const result=[...map.values()].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).slice(-200);
   writeChatCache(room,result);
   return result;
