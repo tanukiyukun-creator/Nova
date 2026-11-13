@@ -488,7 +488,7 @@ function messageBubble(x){
   const image=x.image?'<img class="chat-image" src="'+esc(x.image)+'" onclick="openImage('+JSON.stringify(x.image)+')">':'';
   const text=x.text?'<div class="bubble-text">'+esc(x.text)+'</div>':'';
   const readLabel=mine?'<span class="read-status">'+(read?'既読':'未読')+'</span>':'';
-  const deleteButton=mine?'<button type="button" onclick="deleteChatMessage('+JSON.stringify(x.id)+')">削除</button>':'';
+  const deleteButton=mine?'<button type="button" onclick="deleteChatMessage('+JSON.stringify(x.id)+')">送信取り消し</button>':'';
   return '<div class="bubble-row '+(mine?'mine':'')+'" data-message-id="'+esc(String(x.id||''))+'"><div class="bubble '+(mine?'mine':'')+'"><div class="message-meta"><b>'+(mine?'あなた':esc(x.fromName||'メンバー'))+'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span>'+readLabel+'</div>'+reply+image+text+'<div class="message-actions"><button type="button" onclick="replyMessage('+JSON.stringify(JSON.stringify({id:x.id,text:x.text||'画像'}))+')">↩ 返信</button>'+deleteButton+'</div></div></div>';
 }
 async function deleteChatMessage(id2){
