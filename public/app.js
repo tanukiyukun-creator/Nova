@@ -453,7 +453,8 @@ async function groupChatHtml(room){
   }else{
     data=await api('/api/talks/'+encodeURIComponent(room));
   }
-  let html=(data.messages||[]).map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
+  const messages=Array.isArray(data?.messages)?data.messages:[];
+  let html=messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
   if(room==='classadmin'||room==='gradeadmin'){
     try{
       const elections=await api('/api/elections');
@@ -587,18 +588,29 @@ async function sendCurrentChat(e,extra={}){
     }
     if(input)input.value='';
     window.novaReply=null;
+    // サーバー保存後に必ず最新の履歴を再取得する。
+    // これにより「送信したのに空のトークのまま」を防ぐ。
     const box=$('#chatbox');
-    if(box&&sent){
-      const empty=box.querySelector('.chat-empty-state');
-      if(empty)empty.remove();
-      box.insertAdjacentHTML('beforeend',messageBubble(sent));
-      box.scrollTop=box.scrollHeight;
+    if(box){
+      try{
+        const html=chatRoom==='friend'&&chatTarget
+          ?await chatHtml(chatTarget)
+          :await groupChatHtml(chatRoom);
+        box.innerHTML=html;
+        box.scrollTop=box.scrollHeight;
+      }catch(e){
+        box.innerHTML=messageBubble(sent);
+        box.scrollTop=box.scrollHeight;
+      }
     }else{
       await chat($('#main'));
     }
   }catch(x){toast(x?.message||'メッセージを送信できません')}
 }
-async function chatHtml(id2){const ms=await api('/api/chats/'+id2);return ms.map(x=>messageBubble(x)).join('')||'<p class="sub">まだメッセージはありません。</p>'}
+async function chatHtml(id2){
+  const ms=await api('/api/chats/'+encodeURIComponent(id2));
+  return (Array.isArray(ms)?ms:[]).map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
+}
 async function school(m){
   const [cls,events,tasks,schedule,elections]=await Promise.all([api('/api/class'),api('/api/events'),api('/api/tasks'),api('/api/schedule'),api('/api/elections')]);
   const posts=await api('/api/posts?kind=class');
