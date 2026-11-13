@@ -603,22 +603,15 @@ async function sendCurrentChat(e,extra={}){
     }
     if(input)input.value='';
     window.novaReply=null;
-    // サーバー保存後に必ず最新の履歴を再取得する。
-    // これにより「送信したのに空のトークのまま」を防ぐ。
+    // 送信直後に履歴GETで画面全体を置き換えると、一時的に古い履歴が返った際に
+    // 直前まで表示されていたメッセージが消えることがある。送信成功時は現在の画面へ
+    // サーバーが返したメッセージだけをID単位で追加し、履歴の再描画は行わない。
     const box=$('#chatbox');
-    if(box){
-      // 送信後はサーバー履歴だけを正として1回だけ描画する。WebSocketのエコーとの二重表示を防ぐ。
-      try{
-        const html=chatRoom==='friend'&&chatTarget
-          ?await chatHtml(chatTarget,sent)
-          :await groupChatHtml(chatRoom,sent);
-        box.innerHTML=html;
-        box.scrollTop=box.scrollHeight;
-      }catch(e){
-        console.warn('chat refresh failed',e);
-      }
-    }else{
-      await chat($('#main'));
+    if(box&&sent?.id&&!box.querySelector('[data-message-id="'+CSS.escape(String(sent.id))+'"]')){
+      const empty=box.querySelector('.chat-empty-state');
+      if(empty)box.innerHTML=messageBubble(sent);
+      else box.insertAdjacentHTML('beforeend',messageBubble(sent));
+      box.scrollTop=box.scrollHeight;
     }
   }catch(x){toast(x?.message||'メッセージを送信できません')}
 }
