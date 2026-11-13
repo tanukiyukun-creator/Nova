@@ -496,7 +496,7 @@ async function deleteChatMessage(id2){
   try{
     await api('/api/messages/'+encodeURIComponent(id2)+'/delete',{method:'POST'});
     const box=$('#chatbox');
-    if(box)box.innerHTML=chatRoom==='friend'&&chatTarget'?await chatHtml(chatTarget):await groupChatHtml(chatRoom);
+    if(box)box.innerHTML=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom);
   }catch(e){toast(e.message)}
 }
 function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
