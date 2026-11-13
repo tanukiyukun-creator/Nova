@@ -481,14 +481,14 @@ async function groupChatHtml(room,fallbackMessage=null){
 async function voteElection(electionId,candidateId){try{await api('/api/elections/'+electionId+'/vote',{method:'POST',body:JSON.stringify({candidateId})});toast('投票しました');await render(true)}catch(e){toast(e.message)}}
 async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
 function messageBubble(x){
-  const mine=x.from===me.id;
+  const mine=String(x.from||'')===String(me.id||'');
   const read=mine&&Array.isArray(x.readBy)&&x.readBy.some(id=>id!==me.id);
   const reply=x.replyTo?'<div class="message-reply"><span>返信</span>'+esc(x.replyTo.text||'メッセージ')+'</div>':'';
   if(x.deleted)return '<div class="bubble-row '+(mine?'mine':'')+'" data-message-id="'+esc(String(x.id||''))+'"><div class="bubble '+(mine?'mine':'')+' deleted"><div class="message-meta"><b>'+ (mine?'あなた':esc(x.fromName||'メンバー')) +'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span></div><div class="deleted-message">このメッセージは削除されました</div></div></div>';
   const image=x.image?'<img class="chat-image" src="'+esc(x.image)+'" onclick="openImage('+JSON.stringify(x.image)+')">':'';
   const text=x.text?'<div class="bubble-text">'+esc(x.text)+'</div>':'';
   const readLabel=mine?'<span class="read-status">'+(read?'既読':'未読')+'</span>':'';
-  const deleteButton=mine&&x.id?'<button class="message-cancel-btn" type="button" onclick='+"'"+'deleteChatMessage('+JSON.stringify(String(x.id))+')'+"'"+'>送信取り消し</button>':'';
+  const deleteButton=mine&&x.id?'<button class="message-cancel-btn" type="button" data-message-id="'+esc(String(x.id))+'">送信取り消し</button>':'';
   return '<div class="bubble-row '+(mine?'mine':'')+'" data-message-id="'+esc(String(x.id||''))+'"><div class="bubble '+(mine?'mine':'')+'"><div class="message-meta"><b>'+(mine?'あなた':esc(x.fromName||'メンバー'))+'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span>'+readLabel+'</div>'+reply+image+text+'<div class="message-actions"><button type="button" onclick="replyMessage('+JSON.stringify(JSON.stringify({id:x.id,text:x.text||'画像'}))+')">↩ 返信</button>'+deleteButton+'</div></div></div>';
 }
 async function deleteChatMessage(id2){
@@ -506,6 +506,7 @@ async function deleteChatMessage(id2){
     }
   }catch(e){toast(e.message)}
 }
+document.addEventListener('click',e=>{const b=e.target.closest?.('.message-cancel-btn');if(!b)return;e.preventDefault();e.stopPropagation();deleteChatMessage(b.dataset.messageId)});
 function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
 function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
 function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}const box=$('#chatbox');if(x.type==='message_deleted'){if(!box)return;const row=box.querySelector('[data-message-id="'+CSS.escape(String(x.messageId||''))+'"]');if(row){const holder=document.createElement('div');holder.innerHTML=messageBubble(x.deletedMessage||{id:x.messageId,from:me.id,fromName:'メンバー',createdAt:Date.now(),deleted:true});row.replaceWith(holder.firstElementChild)}return}if(view!=='chat'||!x.message||!['message','group_message','class_message'].includes(x.type))return;if(!box)return;const id=String(x.message.id||'');if(!id||box.querySelector('[data-message-id="'+CSS.escape(id)+'"]'))return;const empty=box.querySelector('.chat-empty-state');if(empty)box.innerHTML=messageBubble(x.message);else box.insertAdjacentHTML('beforeend',messageBubble(x.message));box.scrollTop=box.scrollHeight}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
