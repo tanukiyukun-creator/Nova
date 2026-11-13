@@ -605,3 +605,8 @@ button:active,.btn:active{transform:scale(.98)}
 }
 
 .nova-brand-icon{width:34px;height:34px;display:block;object-fit:cover;border-radius:10px}.logo>.nova-brand-icon{width:40px;height:40px;border-radius:12px}.super-brand>.nova-brand-icon{width:40px;height:40px;border-radius:12px}.auth-logo>.nova-brand-icon{width:44px;height:44px;border-radius:13px}.super-avatar .nova-brand-icon,.school-mark .nova-brand-icon{width:100%;height:100%;border-radius:inherit}.study-book-mark .nova-brand-icon{width:42px;height:42px;border-radius:12px}.avatar>.nova-brand-icon{width:100%;height:100%;border-radius:inherit;object-fit:cover}
+
+.profile-fallback,.book-fallback,.school-fallback{display:grid;place-items:center;font-weight:800;line-height:1}
+.profile-fallback{width:28px;height:28px;border-radius:50%;font-size:14px;color:#d9d4c8;background:linear-gradient(145deg,#303541,#171a22);box-shadow:inset 0 1px 1px rgba(255,255,255,.08)}
+.book-fallback{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:25px;color:#e6dfd0;background:linear-gradient(145deg,#2d3340,#171a22);border:1px solid rgba(255,255,255,.06)}
+.school-fallback{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:24px;color:#d8c59b;background:linear-gradient(145deg,#2b2f39,#15171d);border:1px solid rgba(255,255,255,.06)}
