@@ -979,7 +979,7 @@ async function settings(m){
       <section class="glass card settings-card">
         <div class="settings-card-title"><b>アカウント</b><span>基本情報</span></div>
         <div class="settings-avatar-row">
-          <div class="avatar settings-avatar">${me.icon?'<img src="'+esc(me.icon)+'">':profileFallbackHtml()}</div>
+          <div class="avatar settings-avatar">${(window._settingsIcon||me.icon)?'<img src="'+esc(window._settingsIcon||me.icon)+'">':profileFallbackHtml()}</div>
           <label class="btn alt photo-btn">アイコン写真を変更<input id="settingsIconFile" type="file" accept="image/*" hidden onchange="settingsPhoto(event)"></label>
         </div>
         <div class="settings-grid">
@@ -1020,7 +1020,18 @@ function settingsPhoto(e){
   const f=e.target.files?.[0];if(!f)return;
   if(!f.type.startsWith('image/'))return toast('画像ファイルを選択してください');
   if(f.size>4*1024*1024)return toast('写真は4MB以下にしてください');
-  const r=new FileReader();r.onload=()=>{window._settingsIcon=r.result;settings($('#main'))};r.readAsDataURL(f);
+  const r=new FileReader();
+  r.onload=()=>{
+    window._settingsIcon=String(r.result||'');
+    const img=document.querySelector('.settings-avatar img');
+    if(img)img.src=window._settingsIcon;
+    else{
+      const box=document.querySelector('.settings-avatar');
+      if(box)box.innerHTML='<img src="'+esc(window._settingsIcon)+'">';
+    }
+    toast('アイコンを選択しました。最後に「変更を保存」を押してください');
+  };
+  r.readAsDataURL(f);
 }
 async function saveProfile(e){
   e.preventDefault();
