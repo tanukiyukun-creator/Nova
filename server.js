@@ -12,7 +12,7 @@ app.use(express.json({limit:'8mb'})); app.use(express.static(path.join(__dirname
 const DB=path.join(__dirname,'db.json');
 const empty={users:[],schools:[],messages:[],classTalks:[],talks:[],friends:[],posts:[],events:[],tasks:[],taskCompletions:[],schedules:[],scheduleChanges:[],elections:[],notifications:[],calls:[]};
 const SCHOOL_STARTER=['早稲田大学高等学院','早稲田実業学校高等部','慶應義塾高等学校','開成高等学校','筑波大学附属高等学校','東京学芸大学附属高等学校','日比谷高等学校','浦和高等学校','浦和第一女子高等学校','川越高等学校','川越女子高等学校','川越東高等学校','熊谷高等学校','山村学園高等学校','山村国際高等学校','大宮高等学校','所沢高等学校','春日部高等学校','越谷北高等学校','栄東高等学校','淑徳与野高等学校','明治大学付属明治高等学校','青山学院高等部','中央大学附属高等学校','立教新座高等学校'];
-function load(){if(!fs.existsSync(DB)) fs.writeFileSync(DB,JSON.stringify(empty,null,2)); return JSON.parse(fs.readFileSync(DB,'utf8'));}
+function load(){if(!fs.existsSync(DB)) fs.writeFileSync(DB,JSON.stringify(empty,null,2)); const db=JSON.parse(fs.readFileSync(DB,'utf8')); for(const k of Object.keys(empty)) if(!Array.isArray(db[k])) db[k]=[]; return db;}
 function save(db){fs.writeFileSync(DB,JSON.stringify(db,null,2));}
 function id(){return crypto.randomBytes(12).toString('hex')}
 function hash(p,s=crypto.randomBytes(16).toString('hex')){return `${s}:${crypto.scryptSync(p,s,64).toString('hex')}`}
