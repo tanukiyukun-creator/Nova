@@ -444,7 +444,7 @@ async function startElectionPrompt(room){
     toast(e.message);
   }
 }
-async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
+async async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
 async function closeMobileChat(){chatTarget=null;chatRoom='';await render(true)}
 async function groupChatHtml(room){
   let data;
@@ -456,6 +456,7 @@ async function groupChatHtml(room){
     data=await api('/api/talks/'+encodeURIComponent(room));
   }
   const messages=Array.isArray(data?.messages)?data.messages:[];
+  try{if(room==='friend'&&chatTarget)await api('/api/chats/'+encodeURIComponent(chatTarget)+'/read',{method:'POST'});else if(room==='class'||room==='classadmin'||room==='gradeadmin')await api('/api/talks/'+encodeURIComponent(room)+'/read',{method:'POST'});else if(room.startsWith('group:'))await api('/api/groups/'+encodeURIComponent(room.slice(6))+'/read',{method:'POST'})}catch{}
   let html=messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
   if(room==='classadmin'||room==='gradeadmin'){
     try{
@@ -480,11 +481,23 @@ async function groupChatHtml(room){
 async function voteElection(electionId,candidateId){try{await api('/api/elections/'+electionId+'/vote',{method:'POST',body:JSON.stringify({candidateId})});toast('投票しました');await render(true)}catch(e){toast(e.message)}}
 async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
 function messageBubble(x){
+  const mine=x.from===me.id;
+  const read=mine&&Array.isArray(x.readBy)&&x.readBy.some(id=>id!==me.id);
   const reply=x.replyTo?'<div class="message-reply"><span>返信</span>'+esc(x.replyTo.text||'メッセージ')+'</div>':'';
+  if(x.deleted)return '<div class="bubble-row '+(mine?'mine':'')+'"><div class="bubble '+(mine?'mine':'')+' deleted"><div class="message-meta"><b>'+ (mine?'あなた':esc(x.fromName||'メンバー')) +'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span></div><div class="deleted-message">このメッセージは削除されました</div></div></div>';
   const image=x.image?'<img class="chat-image" src="'+esc(x.image)+'" onclick="openImage('+JSON.stringify(x.image)+')">':'';
-  const sticker='';
   const text=x.text?'<div class="bubble-text">'+esc(x.text)+'</div>':'';
-  return '<div class="bubble-row '+(x.from===me.id?'mine':'')+'"><div class="bubble '+(x.from===me.id?'mine':'')+'"><div class="message-meta"><b>'+(x.from===me.id?'あなた':esc(x.fromName||'メンバー'))+'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span></div>'+reply+image+text+'<div class="message-actions"><button type="button" onclick="replyMessage('+JSON.stringify(JSON.stringify({id:x.id,text:x.text||x.sticker||'画像'}))+')">↩ 返信</button></div></div></div>';
+  const readLabel=mine?'<span class="read-status">'+(read?'既読':'未読')+'</span>':'';
+  const deleteButton=mine?'<button type="button" onclick="deleteChatMessage('+JSON.stringify(x.id)+')">削除</button>':'';
+  return '<div class="bubble-row '+(mine?'mine':'')+'"><div class="bubble '+(mine?'mine':'')+'"><div class="message-meta"><b>'+(mine?'あなた':esc(x.fromName||'メンバー'))+'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span>'+readLabel+'</div>'+reply+image+text+'<div class="message-actions"><button type="button" onclick="replyMessage('+JSON.stringify(JSON.stringify({id:x.id,text:x.text||'画像'}))+')">↩ 返信</button>'+deleteButton+'</div></div></div>';
+}
+async function deleteChatMessage(id2){
+  if(!confirm('このメッセージを削除しますか？'))return;
+  try{
+    await api('/api/messages/'+encodeURIComponent(id2)+'/delete',{method:'POST'});
+    const box=$('#chatbox');
+    if(box)box.innerHTML=chatRoom==='friend'&&chatTarget'?await chatHtml(chatTarget):await groupChatHtml(chatRoom);
+  }catch(e){toast(e.message)}
 }
 function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
 function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
@@ -570,7 +583,7 @@ function endCall(notify=true){
   Object.values(novaPeers).forEach(pc=>pc.close());
   novaPeers={};novaStream?.getTracks().forEach(t=>t.stop());novaStream=null;novaTargets=[];novaCallId=null;novaMode=null;novaRoomKey=null;$('#callWindow')?.remove()
 }
-async function sendCurrentChat(e,extra={}){
+async async function sendCurrentChat(e,extra={}){
   if(e)e.preventDefault();
   const input=$('#chatText');
   const text=String(input?.value||((e?.target instanceof HTMLFormElement)?new FormData(e.target).get('text'):'')||'').trim();
@@ -611,6 +624,7 @@ async function sendCurrentChat(e,extra={}){
 }
 async function chatHtml(id2){
   const ms=await api('/api/chats/'+encodeURIComponent(id2));
+  try{await api('/api/chats/'+encodeURIComponent(id2)+'/read',{method:'POST'})}catch{}
   return (Array.isArray(ms)?ms:[]).map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
 }
 async function school(m){
