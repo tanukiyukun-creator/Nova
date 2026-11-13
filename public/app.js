@@ -270,7 +270,7 @@ async function login(e){
     toast('ログインしました');
   }catch(x){toast(x.message)}
 }
-async async function go(v){view=v;await render(true)}
+async function go(v){view=v;await render(true)}
 async function route(){const m=$('#main');if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='settings')return settings(m);return home(m)}
 let homeSelectedDate=new Date();
 let homeClockTimer=null;
