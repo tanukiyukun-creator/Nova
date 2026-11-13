@@ -505,7 +505,7 @@ function endCall(notify=true){
   Object.values(novaPeers).forEach(pc=>pc.close());
   novaPeers={};novaStream?.getTracks().forEach(t=>t.stop());novaStream=null;novaTargets=[];novaCallId=null;novaMode=null;novaRoomKey=null;$('#callWindow')?.remove()
 }
-async async function sendCurrentChat(e,extra={}){
+async function sendCurrentChat(e,extra={}){
   if(e)e.preventDefault();
   const text=String($('#chatText')?.value||((e?.target instanceof HTMLFormElement)?new FormData(e.target).get('text'):'')||'').trim();
   if(!text&&!extra.image&&!extra.sticker)return;
