@@ -569,18 +569,34 @@ function endCall(notify=true){
 }
 async function sendCurrentChat(e,extra={}){
   if(e)e.preventDefault();
-  const text=String($('#chatText')?.value||((e?.target instanceof HTMLFormElement)?new FormData(e.target).get('text'):'')||'').trim();
+  const input=$('#chatText');
+  const text=String(input?.value||((e?.target instanceof HTMLFormElement)?new FormData(e.target).get('text'):'')||'').trim();
   if(!text&&!extra.image&&!extra.sticker)return;
   const body={text,...extra,replyTo:window.novaReply||null};
   try{
-    if(chatRoom==='friend')await api('/api/chats/'+encodeURIComponent(chatTarget),{method:'POST',body:JSON.stringify(body)});
-    else if(chatRoom==='class')await api('/api/class/messages',{method:'POST',body:JSON.stringify(body)});
-    else if(chatRoom.startsWith('group:'))await api('/api/groups/'+encodeURIComponent(chatRoom.slice(6))+'/messages',{method:'POST',body:JSON.stringify(body)});
-    else await api('/api/talks/'+encodeURIComponent(chatRoom)+'/messages',{method:'POST',body:JSON.stringify(body)});
-    if($('#chatText'))$('#chatText').value='';
+    let sent;
+    if(chatRoom==='friend'){
+      if(!chatTarget)throw new Error('相手を選択してください');
+      sent=await api('/api/chats/'+encodeURIComponent(chatTarget),{method:'POST',body:JSON.stringify(body)});
+    }else if(chatRoom==='class'){
+      sent=await api('/api/class/messages',{method:'POST',body:JSON.stringify(body)});
+    }else if(chatRoom.startsWith('group:')){
+      sent=await api('/api/groups/'+encodeURIComponent(chatRoom.slice(6))+'/messages',{method:'POST',body:JSON.stringify(body)});
+    }else{
+      sent=await api('/api/talks/'+encodeURIComponent(chatRoom)+'/messages',{method:'POST',body:JSON.stringify(body)});
+    }
+    if(input)input.value='';
     window.novaReply=null;
-    await chat($('#main'));
-  }catch(x){toast(x.message)}
+    const box=$('#chatbox');
+    if(box&&sent){
+      const empty=box.querySelector('.chat-empty-state');
+      if(empty)empty.remove();
+      box.insertAdjacentHTML('beforeend',messageBubble(sent));
+      box.scrollTop=box.scrollHeight;
+    }else{
+      await chat($('#main'));
+    }
+  }catch(x){toast(x?.message||'メッセージを送信できません')}
 }
 async function chatHtml(id2){const ms=await api('/api/chats/'+id2);return ms.map(x=>messageBubble(x)).join('')||'<p class="sub">まだメッセージはありません。</p>'}
 async function school(m){
