@@ -610,8 +610,8 @@ async function sendCurrentChat(e,extra={}){
       // 送信後はサーバー履歴だけを正として1回だけ描画する。WebSocketのエコーとの二重表示を防ぐ。
       try{
         const html=chatRoom==='friend'&&chatTarget
-          ?await chatHtml(chatTarget)
-          :await groupChatHtml(chatRoom);
+          ?await chatHtml(chatTarget,sent)
+          :await groupChatHtml(chatRoom,sent);
         box.innerHTML=html;
         box.scrollTop=box.scrollHeight;
       }catch(e){
@@ -622,10 +622,12 @@ async function sendCurrentChat(e,extra={}){
     }
   }catch(x){toast(x?.message||'メッセージを送信できません')}
 }
-async function chatHtml(id2){
+async function chatHtml(id2,fallbackMessage=null){
   const ms=await api('/api/chats/'+encodeURIComponent(id2));
   try{await api('/api/chats/'+encodeURIComponent(id2)+'/read',{method:'POST'})}catch{}
-  return (Array.isArray(ms)?ms:[]).map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
+  const messages=Array.isArray(ms)?[...ms]:[];
+  if(fallbackMessage&&fallbackMessage.id&&!messages.some(x=>x.id===fallbackMessage.id))messages.push(fallbackMessage);
+  return messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
 }
 async function school(m){
   const [cls,events,tasks,schedule,elections]=await Promise.all([api('/api/class'),api('/api/events'),api('/api/tasks'),api('/api/schedule'),api('/api/elections')]);
