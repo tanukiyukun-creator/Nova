@@ -284,6 +284,7 @@ app.post('/api/class/messages',auth,(req,res)=>{try{
   if(!talk){talk={id:id(),schoolId:req.user.schoolId,schoolName:req.user.schoolName,grade:req.user.grade,className:req.user.className,name:`${req.user.grade}年${req.user.className}組 クラストーク`,createdAt:Date.now(),memberIds:[]};db.classTalks.push(talk);}
   if(!talk.memberIds.includes(req.user.id))talk.memberIds.push(req.user.id);
   const text=String(req.body.text||'').trim();
+  if(!text&&!req.body.image&&!req.body.sticker)return res.status(400).json({error:'メッセージを入力してください'});
   const m=buildMessage(req,req.user.id,null,talk.id,'class');
   db.messages.push(m);
   talk.memberIds.filter(x=>x!==req.user.id).forEach(userId=>notify(db,userId,'class_message',talk.name,`${req.user.displayName}からメッセージが届きました`));
