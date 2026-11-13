@@ -364,6 +364,14 @@ async function home(m){
 let chatRoom='class';
 let chatTarget=null;
 async function chat(m){
+  try{await api('/api/me');}catch(e){
+    localStorage.removeItem('novaToken');
+    localStorage.removeItem('novaUser');
+    me=null;
+    renderAuth();
+    toast('ログインセッションが切れています。もう一度ログインしてください');
+    return;
+  }
   wsConnect();
   const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(hasClientRole('CLASS_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
