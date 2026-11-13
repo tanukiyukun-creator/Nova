@@ -1,4 +1,4 @@
-const CACHE='nova-v9';
+const CACHE='nova-v10';
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
@@ -10,7 +10,7 @@ self.addEventListener('fetch',event=>{
     event.respondWith(fetch(event.request,{cache:'no-store'}));
     return;
   }
-  if(['/app.js','/styles.css','/index.html','/'].includes(u.pathname)){
+  if(['/app.js','/styles.css','/index.html','/','/manifest.json','/icon.png','/icon.svg'].includes(u.pathname)){
     event.respondWith(fetch(event.request,{cache:'no-store'}).catch(()=>caches.match(event.request)));
     return;
   }
