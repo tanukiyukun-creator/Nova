@@ -588,3 +588,18 @@ button:active,.btn:active{transform:scale(.98)}
 @media(min-width:801px){
   .line-chat-list{min-width:300px}
 }
+
+/* Chat readability / read / delete */
+.line-messages .bubble-row{max-width:min(88%,760px)}
+.line-messages .bubble{max-width:100%}
+.line-messages .bubble-text{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal}
+.line-messages .message-meta{align-items:center}
+.line-messages .read-status{margin-left:auto;white-space:nowrap;font-size:9px;opacity:.9}
+.line-messages .bubble.mine .read-status{color:#514727}
+.line-messages .bubble.deleted{opacity:.65}
+.line-messages .deleted-message{font-size:13px;font-style:italic;color:var(--muted);padding:3px 0}
+.line-messages .message-actions{display:flex;gap:8px;white-space:nowrap}
+.line-messages .message-actions button:hover{color:#fff}
+@media(max-width:800px){
+  .line-messages .bubble-row{max-width:94%}
+}
