@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111b4a"/>
+      <stop offset=".48" stop-color="#071b55"/>
+      <stop offset="1" stop-color="#082c63"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy=".18" r=".9">
+      <stop offset="0" stop-color="#5965bd" stop-opacity=".72"/>
+      <stop offset=".55" stop-color="#223a8d" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#081536" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff7df"/>
+      <stop offset=".35" stop-color="#e9bd63"/>
+      <stop offset=".7" stop-color="#fff0c7"/>
+      <stop offset="1" stop-color="#b97925"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fffdf5"/>
+      <stop offset=".7" stop-color="#eee9dc"/>
+      <stop offset="1" stop-color="#d7d0c0"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#000" flood-opacity=".42"/>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <path d="M86 346 C145 410 365 430 430 338" fill="none" stroke="url(#gold)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M88 190 C143 93 307 72 392 119" fill="none" stroke="url(#gold)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="115" cy="169" r="7" fill="#fff7df"/>
+  <circle cx="115" cy="169" r="18" fill="#fff7df" opacity=".22" filter="url(#soft)"/>
+  <g filter="url(#shadow)">
+    <path d="M105 279 L247 249 L407 279 L270 332 Z" fill="#11152a"/>
+    <path d="M104 279 L247 249 L247 368 L105 326 Z" fill="url(#paper)"/>
+    <path d="M247 249 L408 279 L270 332 L247 368 Z" fill="url(#paper)"/>
+    <path d="M105 326 L247 368 L247 382 L104 337 Z" fill="url(#gold)"/>
+    <path d="M247 368 L270 332 L408 279 L408 293 L270 347 Z" fill="url(#gold)"/>
+    <path d="M117 285 L237 260 L237 350 L116 316 Z" fill="#fffdf7" opacity=".72"/>
+    <path d="M257 260 L395 285 L276 331 L257 354 Z" fill="#fffdf7" opacity=".68"/>
+  </g>
+  <g filter="url(#shadow)">
+    <path d="M253 342 C284 293 316 232 351 151 C364 121 379 94 405 70 C405 108 391 140 369 165 C345 192 316 214 286 231 C298 201 319 171 343 148 C321 194 289 258 258 343 Z" fill="url(#paper)"/>
+    <path d="M258 343 C285 282 320 213 350 151 C369 111 389 84 405 70 C395 119 373 166 344 209 C317 249 286 300 258 343 Z" fill="url(#gold)" opacity=".92"/>
+    <path d="M258 343 C283 296 314 237 343 178 C322 197 298 214 286 231 C300 201 319 171 343 148 C316 201 284 275 258 343 Z" fill="#fffaf0"/>
+  </g>
+  <path d="M111 279 C151 235 193 220 247 249" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="3"/>
+  <path d="M247 249 C304 226 357 242 408 279" fill="none" stroke="#fff" stroke-opacity=".42" stroke-width="3"/>
+</svg>
