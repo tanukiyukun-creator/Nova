@@ -713,3 +713,7 @@ button:active,.btn:active{transform:scale(.98)}
 .friend-candidate{position:relative}
 .friend-add-btn{margin-left:auto;padding:7px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#d9c58f;color:#16140f;font-weight:700;cursor:pointer}
 .friend-add-btn:hover{filter:brightness(1.06)}
+
+/* Horizontal friend-add pill */
+.line-head-actions .friend-add-top{width:auto;min-width:92px;height:38px;padding:0 15px;display:flex;align-items:center;justify-content:center;white-space:nowrap;word-break:keep-all;border-radius:19px;font-size:12px;line-height:1;font-weight:700}
+.line-head-actions .friend-add-top:hover{transform:none}
