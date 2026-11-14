@@ -373,26 +373,31 @@ app.get('/api/class',auth,(req,res)=>{
   const members=db.users.filter(u=>talk.memberIds.includes(u.id)).map(pub);
   res.json({talk,messages,members});
 });
-app.post('/api/class/messages',auth,(req,res)=>{try{
-  const db=load();
-  if(!Array.isArray(db.classTalks))db.classTalks=[];
-  let talk=db.classTalks.find(x=>x.schoolId===req.user.schoolId&&x.grade===req.user.grade&&x.className===req.user.className);
-  if(!talk){talk={id:id(),schoolId:req.user.schoolId,schoolName:req.user.schoolName,grade:req.user.grade,className:req.user.className,name:`${req.user.grade}年${req.user.className}組 クラストーク`,createdAt:Date.now(),memberIds:[]};db.classTalks.push(talk);}
-  if(!talk.memberIds.includes(req.user.id))talk.memberIds.push(req.user.id);
-  const text=String(req.body.text||'').trim();
-  if(!text&&!req.body.image&&!req.body.sticker)return res.status(400).json({error:'メッセージを入力してください'});
-  const m=buildMessage(req,req.user.id,null,talk.id,'class');
-  db.messages.push(m);
-  talk.memberIds.filter(x=>x!==req.user.id).forEach(userId=>notify(db,userId,'class_message',talk.name,`${req.user.displayName}からメッセージが届きました`,{messageId:m.id,talkId:talk.id,room:'class',chatType:'talk'}));
-  save(db);
-  wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'class_message',message:messagePublic(db,m),talkId:talk.id}))});
-  res.json(messagePublic(db,m));
-}catch(e){res.status(400).json({error:e.message||'メッセージを送信できません'});}
-});
-app.post('/api/class/read',auth,async(req,res)=>{try{await withDbWrite(db=>{const talk=(db.classTalks||[]).find(x=>x.schoolId===req.user.schoolId&&x.grade===req.user.grade&&x.className===req.user.className);if(talk)db.messages.filter(m=>!m.deleted&&m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)})});res.json({ok:true})}catch(e){res.status(500).json({error:'既読更新に失敗しました'})}});save(db);res.json({ok:true})});
-
-  save(db);res.json({ok:true});
-});
+app.post('/api/class/messages',auth,async(req,res)=>{try{
+  const m=await withDbWrite(db=>{
+    if(!Array.isArray(db.classTalks))db.classTalks=[];
+    const dbUser=db.users.find(x=>String(x.id)===String(req.user.id))||req.user;
+    let talk=db.classTalks.find(x=>x.schoolId===dbUser.schoolId&&x.grade===dbUser.grade&&x.className===dbUser.className);
+    if(!talk){talk={id:id(),schoolId:dbUser.schoolId,schoolName:dbUser.schoolName,grade:dbUser.grade,className:dbUser.className,name:dbUser.grade+'年'+dbUser.className+'組 クラストーク',createdAt:Date.now(),memberIds:[]};db.classTalks.push(talk);}
+    if(!talk.memberIds.includes(dbUser.id))talk.memberIds.push(dbUser.id);
+    const text=String(req.body.text||'').trim();
+    if(!text&&!req.body.image&&!req.body.sticker)throw Object.assign(new Error('メッセージを入力してください'),{status:400});
+    const msg=buildMessage(req,dbUser.id,null,talk.id,'class');
+    db.messages.push(msg);
+    talk.memberIds.filter(x=>x!==dbUser.id).forEach(userId=>notify(db,userId,'class_message',talk.name,dbUser.displayName+'からメッセージが届きました',{messageId:msg.id,talkId:talk.id,room:'class',chatType:'talk'}));
+    return msg;
+  });
+  const payload=messagePublic(load(),m);
+  wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'class_message',message:payload,talkId:m.talkId}))});
+  res.json(payload);
+}catch(e){res.status(e.status||400).json({error:e.message||'メッセージを送信できません'});}});
+app.post('/api/class/read',auth,async(req,res)=>{try{
+  await withDbWrite(db=>{
+    const talk=(db.classTalks||[]).find(x=>x.schoolId===req.user.schoolId&&x.grade===req.user.grade&&x.className===req.user.className);
+    if(talk)db.messages.filter(m=>!m.deleted&&m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});
+  });
+  res.json({ok:true});
+}catch(e){res.status(500).json({error:'既読更新に失敗しました'});}});
 app.get('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.query.kind||'class';res.json(db.posts.filter(p=>p.kind===kind&&p.schoolId===s.schoolId&&(kind==='school'||p.grade===s.grade)&&(kind!=='class'||p.className===s.className)).slice(0,100))});
 app.post('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.body.kind||'class'; if(!canManage(req.user,kind))return res.status(403).json({error:'権限がありません'});const p={id:id(),...s,kind,title:req.body.title||'',body:req.body.body||'',authorId:req.user.id,createdAt:Date.now()};db.posts.unshift(p);save(db);res.json(p)});
 function canManage(u,kind){if(hasRole(u,'SUPER_ADMIN')||hasRole(u,'SCHOOL_ADMIN'))return true;if(kind==='grade')return hasRole(u,'GRADE_ADMIN');if(kind==='class')return hasRole(u,'CLASS_ADMIN')||hasRole(u,'GRADE_ADMIN');return false}
