@@ -398,7 +398,9 @@ async function chat(m){
   if(!friends.length){try{friends=await api('/api/friends')}catch(e){friends=[];console.warn('friends load failed',e)}}
   let groups=[];try{groups=await api('/api/groups')}catch(e){groups=[];console.warn('groups load failed',e)}
   let friendRequests={incoming:[],outgoing:[]};try{friendRequests=await api('/api/friend-requests')}catch(e){friendRequests={incoming:[],outgoing:[]};console.warn('friend requests load failed',e)}
+  // Never trust a room left by a previous browser account.
   if(chatRoom==='school')chatRoom='class';
+  if(chatRoom==='class' && (!me?.schoolId || !me?.grade || !me?.className))chatRoom='class';
   if(!rooms.some(r=>r.id===chatRoom)&&!chatRoom.startsWith('group:')&&chatRoom!=='friend')chatRoom='class';
   const selectedFriend=chatRoom==='friend'&&chatTarget?friends.find(x=>x.id===chatTarget):null;
   const selectedGroup=chatRoom.startsWith('group:')?groups.find(x=>x.id===chatRoom.slice(6)):null;
