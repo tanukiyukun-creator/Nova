@@ -502,7 +502,8 @@ async function voteElection(electionId,candidateId){try{await api('/api/election
 async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
 function messageBubble(x){
   const mine=String(x.from||'')===String(me.id||'');
-  const readCount=Number(x.readCount||0);\n  const readTotal=Number(x.readTotal||0);
+  const readCount=Number(x.readCount||0);
+  const readTotal=Number(x.readTotal||0);
   const icon=x.fromIcon||'';
   const avatar=icon?'<img class="chat-avatar" src="'+esc(icon)+'" alt="">':'<span class="chat-avatar-fallback" aria-hidden="true">●</span>';
   const reply='';
