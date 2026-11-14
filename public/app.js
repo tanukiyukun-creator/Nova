@@ -723,7 +723,10 @@ async function sendCurrentChat(e,extra={}){
         const live=$('#chatbox'); if(live){live.innerHTML=fresh;scrollChatToBottom()}
       }catch{}
     }
-  }catch(x){toast(x?.message||'メッセージを送信できません')}
+  }catch(x){
+    console.error('NOVA_SEND_ERROR',x);
+    toast('送信できません: '+(x?.message||'通信エラー')+(x?.status?' ['+x.status+']':''));
+  }
 }
 function chatCacheKey(room){return 'novaChatCache:'+String(me?.id||'guest')+':'+String(room||'');}
 function readChatCache(room){
