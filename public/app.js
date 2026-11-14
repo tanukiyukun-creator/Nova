@@ -744,12 +744,10 @@ async function sendCurrentChat(e,extra={}){
         if(empty)box.innerHTML=messageBubble(sent); else box.insertAdjacentHTML('beforeend',messageBubble(sent));
         box.scrollTop=box.scrollHeight;
       }
-      // Re-read the authoritative server history after sending. This makes the
-      // message survive navigation and ensures the recipient sees the same data.
-      try{
-        const fresh=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget,sent):await groupChatHtml(chatRoom,sent);
-        const live=$('#chatbox'); if(live){live.innerHTML=fresh;scrollChatToBottom()}
-      }catch{}
+      // 送信直後はサーバー側の書き込みキューが完了する前にGETすると、
+      // 古い履歴で画面を上書きして送信したメッセージが消えることがある。
+      // 送信レスポンスをそのまま画面とローカルキャッシュへ反映し、
+      // 次回の履歴取得でサーバー側のメッセージが確認できた時に統合する。
     }
   }catch(x){
     console.error('NOVA_SEND_ERROR',x);
