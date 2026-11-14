@@ -671,3 +671,17 @@ button:active,.btn:active{transform:scale(.98)}
   padding:2px 4px !important;
   font-size:9px !important;
 }
+
+.nova-members-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px}
+.nova-members-bg{position:absolute;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px)}
+.nova-members-card{position:relative;width:min(460px,94vw);max-height:min(720px,88vh);overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:22px;background:#11141b;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.nova-members-head{display:flex;align-items:center;justify-content:space-between;padding:20px 22px;border-bottom:1px solid rgba(255,255,255,.08)}
+.nova-members-head h3{margin:4px 0;font-size:21px}
+.nova-members-head small{color:var(--muted)}
+.nova-members-close{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:#1b2029;color:#fff;font-size:22px;cursor:pointer}
+.nova-members-list{padding:10px;overflow:auto;max-height:calc(min(720px,88vh) - 90px)}
+.nova-member-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:14px}
+.nova-member-row:hover{background:rgba(255,255,255,.04)}
+.nova-member-row .avatar{width:42px;height:42px;flex:0 0 42px}
+.nova-member-row>div:last-child{display:flex;flex-direction:column;gap:3px}
+.nova-member-row small{color:var(--muted)}
