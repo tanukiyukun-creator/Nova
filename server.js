@@ -247,12 +247,24 @@ app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifi
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
 function ensureTalk(db,user,room){
   if(!Array.isArray(db.talks))db.talks=[];
-  let talk=db.talks.find(x=>x.room===room&&x.schoolId===user.schoolId&&(room==='gradeadmin'?true:(x.grade===user.grade&&x.className===user.className)));
+  const sameSchool=x=>String(x.schoolId||'')===String(user.schoolId||'') ||
+    (String(x.schoolName||'').trim() && String(x.schoolName||'').trim()===String(user.schoolName||'').trim());
+  const sameScope=x=>sameSchool(x)&&(room==='gradeadmin' ? true : (String(x.grade||'')===String(user.grade||'')&&String(x.className||'')===String(user.className||'')));
+  let matches=db.talks.filter(x=>x.room===room&&sameScope(x));
+  let talk=matches[0];
   if(!talk){
-    talk={id:id(),room,schoolId:user.schoolId,grade:room==='gradeadmin'?null:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?`${user.grade}年${user.className}組 クラストーク`:room==='school'?'学校トーク':room==='classadmin'?'CLASS ADMIN トーク':'GRADE ADMIN トーク',memberIds:[],createdAt:Date.now()};
+    talk={id:id(),room,schoolId:user.schoolId,schoolName:user.schoolName,grade:room==='gradeadmin'?null:user.grade,className:room==='classadmin'?user.className:null,name:room==='class'?String(user.grade)+'年'+String(user.className)+'組 クラストーク':room==='school'?'学校トーク':room==='classadmin'?'CLASS ADMIN トーク':'GRADE ADMIN トーク',memberIds:[],createdAt:Date.now()};
     db.talks.push(talk);
   }
-  if(room==='school')db.users.filter(x=>x.schoolId===user.schoolId).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
+  for(const duplicate of matches.slice(1)){
+    const ids=new Set([...(talk.memberIds||[]),...(duplicate.memberIds||[])]);
+    talk.memberIds=[...ids];
+    for(const m of (db.messages||[]))if(m.talkId===duplicate.id)m.talkId=talk.id;
+    db.talks=db.talks.filter(x=>x.id!==duplicate.id);
+  }
+  talk.schoolId=user.schoolId;
+  talk.schoolName=user.schoolName;
+  if(room==='school')db.users.filter(x=>sameSchool(x)).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
   if(room==='class')db.users.filter(x=>sameGroup(x,user)).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
   if(room==='classadmin'){
     const allowed=db.users.filter(x=>sameGroup(x,user)&&(hasRole(x,'CLASS_ADMIN')||hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
