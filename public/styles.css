@@ -707,3 +707,9 @@ button:active,.btn:active{transform:scale(.98)}
   background:linear-gradient(145deg,#303541,#171a22) !important;
   border:1px solid rgba(255,255,255,.08) !important;
 }
+
+.line-head-actions{display:flex;align-items:center;gap:6px}
+.friend-add-search{padding:12px 16px 0}
+.friend-candidate{position:relative}
+.friend-add-btn{margin-left:auto;padding:7px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#d9c58f;color:#16140f;font-weight:700;cursor:pointer}
+.friend-add-btn:hover{filter:brightness(1.06)}
