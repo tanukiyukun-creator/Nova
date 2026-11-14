@@ -394,7 +394,7 @@ async function home(m){
 let chatRoom='class';
 let chatTarget=null;
 function resetChatForCurrentUser(){chatRoom='class';chatTarget=null;currentChat=null;friends=[];}
-async async function refreshOpenChat(){
+async function refreshOpenChat(){
   if(view!=='chat'||!$('#chatbox'))return;
   try{
     const room=chatRoom;
