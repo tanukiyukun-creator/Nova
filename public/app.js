@@ -1,7 +1,15 @@
 const $=s=>document.querySelector(s), api=async(path,opt={})=>{opt.headers={...(opt.headers||{}),'Content-Type':'application/json',...(localStorage.novaToken?{Authorization:'Bearer '+localStorage.novaToken}:{})};const r=await fetch(path,opt);const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||'エラー');e.status=r.status;throw e}return j};
 let me=JSON.parse(localStorage.novaUser||'null'), view='home', friends=[], currentChat=null, books=[];
+try{const cachedIcon=localStorage.getItem('novaUserIcon');if(me&&!me.icon&&cachedIcon)me.icon=cachedIcon}catch{}
 function hasClientRole(role){return me?.role===role||Array.isArray(me?.adminRoles)&&me.adminRoles.includes(role)}
-function persistUser(u){try{const compact={...u};delete compact.icon;localStorage.removeItem('novaUser');localStorage.setItem('novaUser',JSON.stringify(compact))}catch(e){console.warn('Nova user cache could not be saved',e)}}
+function persistUser(u){
+  try{
+    const compact={...u};delete compact.icon;
+    localStorage.setItem('novaUser',JSON.stringify(compact));
+    if(u?.icon)localStorage.setItem('novaUserIcon',u.icon);
+    else localStorage.removeItem('novaUserIcon');
+  }catch(e){console.warn('Nova user cache could not be saved',e)}
+}
 const novaIconHtml=()=>'<img class="nova-brand-icon" src="/icon.svg?v=5" alt="">';
 const profileFallbackHtml=()=>'<span class="profile-fallback" aria-hidden="true">●</span>';
 const bookIconHtml=()=>'<span class="book-fallback" aria-hidden="true">▤</span>';
