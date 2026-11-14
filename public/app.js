@@ -603,7 +603,7 @@ async function deleteChatMessage(id2){
 document.addEventListener('click',e=>{const b=e.target.closest?.('.message-cancel-btn');if(!b)return;e.preventDefault();e.stopPropagation();deleteChatMessage(b.dataset.messageId)});
 function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
 function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
-function wsConnect(){if(!me||window.novaWs?.readyState===WebSocket.OPEN)return;try{const p=location.protocol==='https:'?'wss':'ws';window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(localStorage.novaToken||''));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}const box=$('#chatbox');if(x.type==='message_deleted'){if(!box)return;const row=box.querySelector('[data-message-id="'+CSS.escape(String(x.messageId||''))+'"]');if(row)row.remove();return}if(view!=='chat'||!x.message||!['message','group_message','class_message'].includes(x.type))return;if(!box)return;const id=String(x.message.id||'');if(!id||box.querySelector('[data-message-id="'+CSS.escape(id)+'"]'))return;const empty=box.querySelector('.chat-empty-state');if(empty)box.innerHTML=messageBubble(x.message);else box.insertAdjacentHTML('beforeend',messageBubble(x.message));box.scrollTop=box.scrollHeight}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;setTimeout(()=>me&&wsConnect(),2000)}}catch{}}function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
+function wsConnect(){if(!me)return;const token=localStorage.novaToken||'';if(window.novaWs?.readyState===WebSocket.OPEN&&window.novaWsToken===token)return;if(window.novaWs){try{window.novaWs.close()}catch{}window.novaWs=null}try{const p=location.protocol==='https:'?'wss':'ws';window.novaWsToken=token;window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(token));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}const box=$('#chatbox');if(x.type==='message_deleted'){if(!box)return;const row=box.querySelector('[data-message-id="'+CSS.escape(String(x.messageId||''))+'"]');if(row)row.remove();return}if(view!=='chat'||!x.message||!['message','group_message','class_message'].includes(x.type))return;if(!box)return;const id=String(x.message.id||'');if(!id||box.querySelector('[data-message-id="'+CSS.escape(id)+'"]'))return;const empty=box.querySelector('.chat-empty-state');if(empty)box.innerHTML=messageBubble(x.message);else box.insertAdjacentHTML('beforeend',messageBubble(x.message));box.scrollTop=box.scrollHeight}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;window.novaWsToken='';setTimeout(()=>me&&localStorage.novaToken&&wsConnect(),2000)}}catch{}}function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
 let novaPeers={},novaStream=null,novaTargets=[],novaMode=null,novaRoomKey=null,novaCallId=null;
 function callScope(){
   if(chatRoom==='friend')return {scope:'friend',ids:chatTarget?[chatTarget]:[]};
@@ -710,13 +710,18 @@ async function sendCurrentChat(e,extra={}){
     const box=$('#chatbox');
     if(sent?.id){
       const cacheRoom=chatRoom==='friend'&&chatTarget?'friend:'+chatTarget:chatRoom;
-      const cached=mergeChatMessages(cacheRoom,[],sent);
+      mergeChatMessages(cacheRoom,[],sent);
       if(box&&!box.querySelector('[data-message-id="'+CSS.escape(String(sent.id))+'"]')){
         const empty=box.querySelector('.chat-empty-state');
-        if(empty)box.innerHTML=messageBubble(sent);
-        else box.insertAdjacentHTML('beforeend',messageBubble(sent));
+        if(empty)box.innerHTML=messageBubble(sent); else box.insertAdjacentHTML('beforeend',messageBubble(sent));
         box.scrollTop=box.scrollHeight;
       }
+      // Re-read the authoritative server history after sending. This makes the
+      // message survive navigation and ensures the recipient sees the same data.
+      try{
+        const fresh=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget,sent):await groupChatHtml(chatRoom,sent);
+        const live=$('#chatbox'); if(live){live.innerHTML=fresh;scrollChatToBottom()}
+      }catch{}
     }
   }catch(x){toast(x?.message||'メッセージを送信できません')}
 }
