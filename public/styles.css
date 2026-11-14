@@ -469,10 +469,17 @@ button:active,.btn:active{transform:scale(.98)}
 .line-messages .bubble{
   position:relative;
   padding:9px 12px 8px;
-  border-radius:18px;
+  border-radius:18px !important;
   background:#20252d;
   border:0;
   box-shadow:none;
+  overflow:hidden;
+}
+.line-messages .bubble.mine{
+  border-radius:18px 18px 6px 18px !important;
+}
+.line-messages .bubble:not(.mine){
+  border-radius:18px 18px 18px 6px !important;
 }
 .line-messages .bubble.mine{
   background:#cbb777;
