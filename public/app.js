@@ -394,7 +394,7 @@ async function home(m){
 let chatRoom='class';
 let chatTarget=null;
 function resetChatForCurrentUser(){chatRoom='class';chatTarget=null;currentChat=null;friends=[];}
-async function refreshOpenChat(){
+async async function refreshOpenChat(){
   if(view!=='chat'||!$('#chatbox'))return;
   try{
     const room=chatRoom;
@@ -717,7 +717,7 @@ async function sendCurrentChat(e,extra={}){
   const input=$('#chatText');
   const text=String(input?.value||((e?.target instanceof HTMLFormElement)?new FormData(e.target).get('text'):'')||'').trim();
   if(!text&&!extra.image&&!extra.sticker)return;
-  const body={text,...extra,replyTo:window.novaReply||null};
+  const body={text,...extra};
   try{
     let sent;
     if(chatRoom==='friend'){
