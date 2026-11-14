@@ -629,3 +629,12 @@ button:active,.btn:active{transform:scale(.98)}
 .profile-fallback{width:28px;height:28px;border-radius:50%;font-size:14px;color:#d9d4c8;background:linear-gradient(145deg,#303541,#171a22);box-shadow:inset 0 1px 1px rgba(255,255,255,.08)}
 .book-fallback{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:25px;color:#e6dfd0;background:linear-gradient(145deg,#2d3340,#171a22);border:1px solid rgba(255,255,255,.06)}
 .school-fallback{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:24px;color:#d8c59b;background:linear-gradient(145deg,#2b2f39,#15171d);border:1px solid rgba(255,255,255,.06)}
+
+/* Final chat UI polish */
+.line-messages .bubble{border-radius:20px !important}
+.line-messages .bubble.mine{border-radius:20px !important}
+.line-messages .bubble:not(.mine){border-radius:20px !important}
+.line-messages .message-actions{margin-top:4px;display:flex;justify-content:flex-end;gap:6px}
+.line-messages .message-cancel-btn{padding:3px 6px!important;font-size:9px!important;border-radius:6px!important;background:transparent!important;color:rgba(255,255,255,.58)!important;border:0!important;font-weight:500!important}
+.line-messages .bubble.mine .message-cancel-btn{color:rgba(35,31,22,.62)!important}
+.line-messages .message-cancel-btn:hover{background:rgba(255,255,255,.12)!important;color:inherit!important}
