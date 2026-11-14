@@ -403,7 +403,7 @@ function scrollChatToBottom(){
   requestAnimationFrame(()=>{move();requestAnimationFrame(move)});
   box.querySelectorAll('img').forEach(img=>img.addEventListener('load',move,{once:true}));
 }
-  m.innerHTML='<div class="line-chat"><aside class="line-chat-list glass '+(mobileChatOpen?'mobile-hide':'')+'"><div class="line-list-head"><div><div class="eyebrow">NOVA</div><h2>トーク</h2></div><button class="line-new" onclick="createGroup()">＋</button></div><div class="line-search"><input class="input" placeholder="トーク・友達を検索" oninput="filterChatList(this.value)"></div><div id="lineRoomList"><div class="line-label">学校</div>'+rooms.map(roomButton).join('')+'<div class="line-label">グループ</div>'+(groups.map(groupButton).join('')||'<div class="line-empty">グループはありません</div>')+'<div class="line-label">友達</div>'+(friends.map(friendButton).join('')||'<div class="line-empty">友達を追加するとここに表示されます</div>')+'</div></aside><section class="line-chat-main glass '+(mobileChatOpen?'mobile-show':'')+'"><header class="line-header"><button class="line-back" onclick="closeMobileChat()">‹</button><div class="line-header-avatar">'+(selectedFriend?avatarHtml(selectedFriend):'<span class="line-avatar">'+(selectedGroup?'G':room?.icon||'C')+'</span>')+'</div><div class="line-header-name"><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div>'+'<div class="line-call">'+((room||selectedGroup)?'<button class="line-call-btn" title="所属メンバー" onclick="showTalkMembers()">👥</button>':'')+((chatRoom==='classadmin'||chatRoom==='gradeadmin')?'<button class="line-call-btn" title="管理者選出" onclick="startElectionPrompt(\''+chatRoom+'\')">投票</button>':'')+((selectedFriend||selectedGroup||room)?'<button class="line-call-btn" title="音声通話" onclick="startCall(\'audio\')">☎</button><button class="line-call-btn video" title="ビデオ通話" onclick="startCall(\'video\')">▣</button>':'')+'</div>'+'</header><div id="chatbox" class="line-messages">'+boxHtml+'</div>'+(canCompose?'<form class="line-compose" onsubmit="sendCurrentChat(event)"><label class="line-attach">＋<input type="file" accept="image/*" hidden onchange="sendImageFile(event)"></label><input id="chatText" class="line-input" name="text" placeholder="メッセージ" autocomplete="off"><button class="line-send" type="submit">➤</button></form>':'<div class="line-readonly">このトークにはメッセージを送信できません。</div>')+'</section></div>';
+  m.innerHTML='<div class="line-chat"><aside class="line-chat-list glass '+(mobileChatOpen?'mobile-hide':'')+'"><div class="line-list-head"><div><div class="eyebrow">NOVA</div><h2>トーク</h2></div><div class="line-head-actions"><button class="line-new" title="友達を追加" onclick="openFriendAdd()">人＋</button><button class="line-new" title="グループ作成" onclick="createGroup()">＋</button></div></div><div class="line-search"><input class="input" placeholder="トーク・友達を検索" oninput="filterChatList(this.value)"></div><div id="lineRoomList"><div class="line-label">学校</div>'+rooms.map(roomButton).join('')+'<div class="line-label">グループ</div>'+(groups.map(groupButton).join('')||'<div class="line-empty">グループはありません</div>')+'<div class="line-label">友達</div>'+(friends.map(friendButton).join('')||'<div class="line-empty">友達を追加するとここに表示されます</div>')+'</div></aside><section class="line-chat-main glass '+(mobileChatOpen?'mobile-show':'')+'"><header class="line-header"><button class="line-back" onclick="closeMobileChat()">‹</button><div class="line-header-avatar">'+(selectedFriend?avatarHtml(selectedFriend):'<span class="line-avatar">'+(selectedGroup?'G':room?.icon||'C')+'</span>')+'</div><div class="line-header-name"><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div>'+'<div class="line-call">'+((room||selectedGroup)?'<button class="line-call-btn" title="所属メンバー" onclick="showTalkMembers()">👥</button>':'')+((chatRoom==='classadmin'||chatRoom==='gradeadmin')?'<button class="line-call-btn" title="管理者選出" onclick="startElectionPrompt(\''+chatRoom+'\')">投票</button>':'')+((selectedFriend||selectedGroup||room)?'<button class="line-call-btn" title="音声通話" onclick="startCall(\'audio\')">☎</button><button class="line-call-btn video" title="ビデオ通話" onclick="startCall(\'video\')">▣</button>':'')+'</div>'+'</header><div id="chatbox" class="line-messages">'+boxHtml+'</div>'+(canCompose?'<form class="line-compose" onsubmit="sendCurrentChat(event)"><label class="line-attach">＋<input type="file" accept="image/*" hidden onchange="sendImageFile(event)"></label><input id="chatText" class="line-input" name="text" placeholder="メッセージ" autocomplete="off"><button class="line-send" type="submit">➤</button></form>':'<div class="line-readonly">このトークにはメッセージを送信できません。</div>')+'</section></div>';
   scrollChatToBottom();
 }
 async function showTalkMembers(){
@@ -420,6 +420,31 @@ async function showTalkMembers(){
   }catch(e){toast(e.message||'メンバーを取得できません')}
 }
 function closeTalkMembers(){document.getElementById('novaMembersModal')?.remove()}
+async function openFriendAdd(){
+  const html='<div class="nova-members-modal" id="friendAddModal"><div class="nova-members-bg" onclick="closeFriendAdd()"></div><div class="nova-members-card"><div class="nova-members-head"><div><div class="eyebrow">NOVA / FRIENDS</div><h3>友達を追加</h3><small>名前・学校名・学年・クラスで検索</small></div><button type="button" class="nova-members-close" onclick="closeFriendAdd()">×</button></div><div class="friend-add-search"><input id="friendSearchInput" class="input" placeholder="名前や学校名を入力" autocomplete="off" oninput="searchFriendCandidates()"></div><div id="friendCandidates" class="nova-members-list"><div class="line-empty">検索すると候補が表示されます</div></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+  $('#friendSearchInput')?.focus();
+}
+function closeFriendAdd(){document.getElementById('friendAddModal')?.remove()}
+async function searchFriendCandidates(){
+  const q=String($('#friendSearchInput')?.value||'').trim();
+  if(!q){$('#friendCandidates').innerHTML='<div class="line-empty">検索すると候補が表示されます</div>';return}
+  try{
+    const us=await api('/api/users/search?q='+encodeURIComponent(q));
+    const friendsSet=new Set((await api('/api/friends')).map(x=>x.id));
+    const list=us.filter(u=>u.id!==me.id&&!friendsSet.has(u.id));
+    $('#friendCandidates').innerHTML=list.map(u=>'<div class="nova-member-row friend-candidate">'+avatarHtml(u)+'<div><b>'+esc(u.displayName||'メンバー')+'</b><small>'+esc((u.schoolName||'')+(u.grade?' · '+u.grade+'年':'')+(u.className?' '+u.className+'組':''))+'</small></div><button class="friend-add-btn" onclick="addFriendFromSearch('+JSON.stringify(u.id)+')">追加</button></div>').join('')||'<div class="line-empty">追加できるユーザーが見つかりません</div>';
+  }catch(e){toast(e.message||'ユーザーを検索できません')}
+}
+async function addFriendFromSearch(id2){
+  try{
+    await api('/api/friends/'+encodeURIComponent(id2),{method:'POST'});
+    toast('友達に追加しました');
+    friends=await api('/api/friends');
+    await searchFriendCandidates();
+    chat($('#main'));
+  }catch(e){toast(e.message||'友達追加に失敗しました')}
+}
 function filterChatList(q){const s=String(q||'').trim().toLowerCase();document.querySelectorAll('#lineRoomList .line-room').forEach(b=>{b.style.display=!s||b.textContent.toLowerCase().includes(s)?'flex':'none'})}async function createGroup(){
   if(!friends.length)friends=await api('/api/friends');
   if(!friends.length)return toast('先に友達を追加してください');
