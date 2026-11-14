@@ -210,16 +210,21 @@ app.patch('/api/me',auth,(req,res)=>{
 app.get('/api/users/search',auth,(req,res)=>{const db=load(),q=(req.query.q||'').toLowerCase();res.json(db.users.filter(u=>u.id!==req.user.id&&(!q||u.displayName.toLowerCase().includes(q))).slice(0,30).map(pub))});
 app.post('/api/friends/:id',auth,(req,res)=>{const db=load(); if(!db.users.some(u=>u.id===req.params.id))return res.status(404).end(); if(!db.friends.some(f=>f.a===req.user.id&&f.b===req.params.id)){db.friends.push({a:req.user.id,b:req.params.id,createdAt:Date.now()});save(db)} res.json({ok:true})});
 app.get('/api/friends',auth,(req,res)=>{const db=load();const ids=db.friends.filter(f=>f.a===req.user.id||f.b===req.user.id).map(f=>f.a===req.user.id?f.b:f.a);res.json(db.users.filter(u=>ids.includes(u.id)).map(pub))});
-app.get('/api/chats/:otherId',auth,(req,res)=>{const db=load();const list=db.messages.filter(m=>(m.from===req.user.id&&m.to===req.params.otherId)||(m.from===req.params.otherId&&m.to===req.user.id)).slice(-200).map(m=>({...m,fromName:db.users.find(u=>u.id===m.from)?.displayName||'メンバー',toName:db.users.find(u=>u.id===m.to)?.displayName||'メンバー'}));res.json(list)});
+app.get('/api/chats/:otherId',auth,(req,res)=>{const db=load();const list=db.messages.filter(m=>(m.from===req.user.id&&m.to===req.params.otherId)||(m.from===req.params.otherId&&m.to===req.user.id)).slice(-200).map(m=>messagePublic(db,m));res.json(list)});
 function buildMessage(req,from,to,talkId,type){
   const text=String(req.body.text||'').trim(),image=String(req.body.image||''),sticker=String(req.body.sticker||'');
   if(!text&&!image&&!sticker)throw new Error('メッセージが空です');
   if(image&&(!image.startsWith('data:image/')||image.length>6*1024*1024))throw new Error('画像を送信できません');
   return {id:id(),type,from,to:to||null,talkId:talkId||null,text,image,sticker,replyTo:req.body.replyTo||null,createdAt:Date.now(),readBy:[]};
 }
+function messagePublic(db,m){
+  const from=db.users.find(u=>u.id===m.from);
+  const to=m.to?db.users.find(u=>u.id===m.to):null;
+  return {...m,fromName:from?.displayName||'メンバー',fromIcon:from?.icon||'',toName:to?.displayName||'メンバー',toIcon:to?.icon||''};
+}
 app.post('/api/chats/:otherId',auth,(req,res)=>{try{const db=load();if(!db.users.some(u=>u.id===req.params.otherId))return res.status(404).json({error:'相手が見つかりません'});const m=buildMessage(req,req.user.id,req.params.otherId,null,'direct');db.messages.push(m);notify(db,m.to,'message','新しいメッセージ',req.user.displayName+'からメッセージが届きました');save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message',message:{...m,fromName:req.user.displayName,toName:db.users.find(u=>u.id===m.to)?.displayName||'メンバー'}}))});res.json(m)}catch(e){res.status(400).json({error:e.message})}});
 app.post('/api/chats/:otherId/read',auth,(req,res)=>{const db=load();db.messages.filter(m=>m.from===req.params.otherId&&m.to===req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
-app.post('/api/messages/:id/delete',auth,(req,res)=>{const db=load(),m=db.messages.find(x=>x.id===req.params.id);if(!m)return res.status(404).json({error:'メッセージが見つかりません'});if(m.from!==req.user.id)return res.status(403).json({error:'自分のメッセージのみ送信取り消しできます'});m.deleted=true;m.text='';m.image='';m.sticker='';save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message_deleted',messageId:m.id,deletedMessage:{...m,fromName:req.user.displayName}}))});res.json({ok:true});});
+app.post('/api/messages/:id/delete',auth,(req,res)=>{const db=load(),m=db.messages.find(x=>x.id===req.params.id);if(!m)return res.status(404).json({error:'メッセージが見つかりません'});if(m.from!==req.user.id)return res.status(403).json({error:'自分のメッセージのみ送信取り消しできます'});m.deleted=true;m.text='';m.image='';m.sticker='';save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message_deleted',messageId:m.id,deletedMessage:messagePublic(db,m)}))});res.json({ok:true});});
 app.post('/api/talks/:room/read',auth,(req,res)=>{const room=String(req.params.room);if(!['class','classadmin','gradeadmin'].includes(room))return res.status(400).json({error:'トーク種別が不正です'});const db=load(),talk=ensureTalk(db,req.user,room);if(!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このトークのメンバーではありません'});db.messages.filter(m=>m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true});});
 app.post('/api/groups/:id/read',auth,(req,res)=>{const db=load(),talk=(db.talks||[]).find(t=>t.id===req.params.id&&t.room==='group');if(!talk||!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このグループのメンバーではありません'});db.messages.filter(m=>m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true});});
 
@@ -249,14 +254,14 @@ function ensureTalk(db,user,room){
 app.get('/api/call/participants',auth,(req,res)=>{try{const db=load();const scopeType=String(req.query.scope||'friend');let ids=[];if(scopeType==='school'){ids=db.users.filter(u=>u.schoolId===req.user.schoolId).map(u=>u.id)}else if(scopeType==='group'){const g=(db.talks||[]).find(t=>t.room==='group'&&t.id===String(req.query.groupId||'')&&Array.isArray(t.memberIds)&&t.memberIds.includes(req.user.id));if(!g)return res.status(403).json({error:'このグループのメンバーではありません'});ids=g.memberIds}else if(['class','classadmin','gradeadmin'].includes(scopeType)){const t=ensureTalk(db,req.user,scopeType);ids=t.memberIds}else{return res.status(400).json({error:'通話対象が不正です'})}ids=[...new Set(ids.filter(id=>id!==req.user.id))];res.json({participants:ids.map(id=>{const u=db.users.find(x=>x.id===id);return u?pub(u):null}).filter(Boolean)});}catch(e){res.status(400).json({error:e.message||'通話参加者を取得できません'})}});
 app.get('/api/groups',auth,(req,res)=>{const db=load();const groups=(db.talks||[]).filter(t=>t.room==='group'&&Array.isArray(t.memberIds)&&t.memberIds.includes(req.user.id)).map(t=>({id:t.id,name:t.name,memberIds:t.memberIds,createdBy:t.createdBy,createdAt:t.createdAt}));res.json(groups)});
 app.post('/api/groups',auth,(req,res)=>{try{const db=load();const name=String(req.body.name||'').trim();if(!name)return res.status(400).json({error:'グループ名を入力してください'});if(name.length>40)return res.status(400).json({error:'グループ名は40文字以内です'});const ids=Array.isArray(req.body.memberIds)?req.body.memberIds.map(String):[];const unique=[req.user.id,...ids.filter(x=>x!==req.user.id)];const valid=unique.filter(uid=>db.users.some(u=>u.id===uid));if(valid.length<2)return res.status(400).json({error:'友達を1人以上選択してください'});const friendIds=new Set(db.friends.filter(f=>f.a===req.user.id||f.b===req.user.id).map(f=>f.a===req.user.id?f.b:f.a));if(valid.slice(1).some(uid=>!friendIds.has(uid)))return res.status(403).json({error:'友達として追加した相手だけグループに追加できます'});const talk={id:id(),room:'group',schoolId:req.user.schoolId,grade:req.user.grade,className:req.user.className,name,memberIds:valid,createdBy:req.user.id,createdAt:Date.now()};if(!Array.isArray(db.talks))db.talks=[];db.talks.push(talk);valid.filter(x=>x!==req.user.id).forEach(uid=>notify(db,uid,'group_message',name,req.user.displayName+'がグループを作成しました'));save(db);res.json({id:talk.id,name:talk.name,memberIds:talk.memberIds})}catch(e){res.status(400).json({error:e.message||'グループを作成できません'})}});
-app.get('/api/groups/:id',auth,(req,res)=>{const db=load(),talk=(db.talks||[]).find(t=>t.id===req.params.id&&t.room==='group');if(!talk||!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このグループのメンバーではありません'});const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>({...m,fromName:db.users.find(u=>u.id===m.from)?.displayName||'メンバー'}));res.json({talk,messages})});
-app.post('/api/groups/:id/messages',auth,(req,res)=>{const db=load(),talk=(db.talks||[]).find(t=>t.id===req.params.id&&t.room==='group');if(!talk||!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このグループのメンバーではありません'});const text=String(req.body.text||'').trim();if(!text)return res.status(400).json({error:'メッセージを入力してください'});const m=buildMessage(req,req.user.id,null,talk.id,'group');db.messages.push(m);talk.memberIds.filter(x=>x!==req.user.id).forEach(uid=>notify(db,uid,'group_message',talk.name,req.user.displayName+'からメッセージが届きました'));save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:{...m,fromName:req.user.displayName},talkId:talk.id}))});res.json(m)});
+app.get('/api/groups/:id',auth,(req,res)=>{const db=load(),talk=(db.talks||[]).find(t=>t.id===req.params.id&&t.room==='group');if(!talk||!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このグループのメンバーではありません'});const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>messagePublic(db,m));res.json({talk,messages})});
+app.post('/api/groups/:id/messages',auth,(req,res)=>{const db=load(),talk=(db.talks||[]).find(t=>t.id===req.params.id&&t.room==='group');if(!talk||!talk.memberIds.includes(req.user.id))return res.status(403).json({error:'このグループのメンバーではありません'});const text=String(req.body.text||'').trim();if(!text)return res.status(400).json({error:'メッセージを入力してください'});const m=buildMessage(req,req.user.id,null,talk.id,'group');db.messages.push(m);talk.memberIds.filter(x=>x!==req.user.id).forEach(uid=>notify(db,uid,'group_message',talk.name,req.user.displayName+'からメッセージが届きました'));save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:messagePublic(db,m),talkId:talk.id}))});res.json(messagePublic(db,m))});
 app.get('/api/talks',auth,(req,res)=>{
   try{
     const room=String(req.query.room||'class');
     if(!['class','classadmin','gradeadmin'].includes(room))return res.status(400).json({error:'トーク種別が不正です'});
     const db=load(),talk=ensureTalk(db,req.user,room);
-    const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>({...m,fromName:db.users.find(u=>u.id===m.from)?.displayName||'メンバー'}));
+    const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>messagePublic(db,m));
     save(db);
     res.json({talk,messages});
   }catch(e){res.status(500).json({error:e.message||'トークを取得できません'});}
@@ -265,7 +270,7 @@ app.get('/api/talks/:room',auth,(req,res)=>{
   const room=String(req.params.room);
   if(!['school','class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
   const db=load(),talk=ensureTalk(db,req.user,room);
-  const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>({...m,fromName:db.users.find(u=>u.id===m.from)?.displayName||'メンバー'}));
+  const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>messagePublic(db,m));
   res.json({talk,messages});
 });
 app.post('/api/talks/:room/messages',auth,(req,res)=>{
@@ -275,7 +280,7 @@ app.post('/api/talks/:room/messages',auth,(req,res)=>{
   const text=String(req.body.text||'').trim();if(!text)return res.status(400).json({error:'メッセージを入力してください'});
   const m=buildMessage(req,req.user.id,null,talk.id,'group');
   db.messages.push(m);talk.memberIds.filter(x=>x!==req.user.id).forEach(uid=>notify(db,uid,'group_message',talk.name,`${req.user.displayName}からメッセージが届きました`));
-  save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:{...m,fromName:req.user.displayName},talkId:talk.id}))});res.json({...m,fromName:req.user.displayName});
+  save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:messagePublic(db,m),talkId:talk.id}))});res.json(messagePublic(db,m));
 });
 function scope(req){return {schoolId:req.user.schoolId,grade:req.user.grade,className:req.user.className}}
 app.get('/api/class',auth,(req,res)=>{
@@ -287,7 +292,7 @@ app.get('/api/class',auth,(req,res)=>{
     db.classTalks.push(talk);
   }
   if(!talk.memberIds.includes(req.user.id)){talk.memberIds.push(req.user.id);save(db);}
-  const messages=(db.messages||[]).filter(m=>m.type==='class'&&m.talkId===talk.id).slice(-200).map(m=>({...m,fromName:db.users.find(u=>u.id===m.from)?.displayName||'クラスメンバー'}));
+  const messages=(db.messages||[]).filter(m=>m.type==='class'&&m.talkId===talk.id).slice(-200).map(m=>messagePublic(db,m));
   const members=db.users.filter(u=>talk.memberIds.includes(u.id)).map(pub);
   res.json({talk,messages,members});
 });
@@ -303,7 +308,7 @@ app.post('/api/class/messages',auth,(req,res)=>{try{
   db.messages.push(m);
   talk.memberIds.filter(x=>x!==req.user.id).forEach(userId=>notify(db,userId,'class_message',talk.name,`${req.user.displayName}からメッセージが届きました`));
   save(db);
-  wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'class_message',message:m,talkId:talk.id}))});
+  wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'class_message',message:messagePublic(db,m),talkId:talk.id}))});
   res.json(m);
 }catch(e){res.status(400).json({error:e.message||'メッセージを送信できません'});}
 });
