@@ -685,3 +685,25 @@ button:active,.btn:active{transform:scale(.98)}
 .nova-member-row .avatar{width:42px;height:42px;flex:0 0 42px}
 .nova-member-row>div:last-child{display:flex;flex-direction:column;gap:3px}
 .nova-member-row small{color:var(--muted)}
+
+.nova-member-row .chat-avatar,
+.nova-member-row .chat-avatar-fallback{
+  width:42px !important;
+  height:42px !important;
+  flex:0 0 42px !important;
+  border-radius:50% !important;
+  object-fit:cover !important;
+  display:grid !important;
+  place-items:center !important;
+  overflow:hidden !important;
+}
+.nova-member-row .chat-avatar{
+  background:#171a22 !important;
+  border:1px solid rgba(255,255,255,.10) !important;
+}
+.nova-member-row .chat-avatar-fallback{
+  font-size:12px !important;
+  color:#d9d4c8 !important;
+  background:linear-gradient(145deg,#303541,#171a22) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+}
