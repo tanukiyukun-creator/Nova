@@ -29,7 +29,8 @@ function clearNovaAccountState(){
   localStorage.removeItem('novaUser');
   localStorage.removeItem('novaUserIcon');
   localStorage.removeItem('novaToken');
-  try{Object.keys(localStorage).filter(k=>k.startsWith('novaChatCache:')).forEach(k=>localStorage.removeItem(k))}catch{}
+  // Chat history belongs to the account/server, so never delete chat caches on logout.
+  // Caches are namespaced by user id and therefore cannot leak into another account.
 }
 function logout(){clearNovaAccountState();me=null;friends=[];chatRoom='class';chatTarget=null;currentChat=null;view='home';render()}
 async function render(skipAuthRefresh=false){if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&hasClientRole('SUPER_ADMIN'))return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他'],...(hasClientRole('SUPER_ADMIN')?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',settings:'その他'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':profileFallbackHtml()}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
@@ -719,7 +720,7 @@ async function sendCurrentChat(e,extra={}){
     }
   }catch(x){toast(x?.message||'メッセージを送信できません')}
 }
-function chatCacheKey(room){return 'novaChatCache:'+String(room||'');}
+function chatCacheKey(room){return 'novaChatCache:'+String(me?.id||'guest')+':'+String(room||'');}
 function readChatCache(room){
   try{const x=JSON.parse(localStorage.getItem(chatCacheKey(room))||'[]');return Array.isArray(x)?x:[]}catch{return []}
 }
