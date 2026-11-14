@@ -337,18 +337,27 @@ app.get('/api/talks/:room',auth,(req,res)=>{
     .map(m=>messagePublic(db,m));
   res.json({talk,messages});
 });
-app.post('/api/talks/:room/messages',auth,(req,res)=>{
-  const room=String(req.params.room);if(!['school','class','classadmin','gradeadmin'].includes(room))return res.status(400).json({error:'トーク種別が不正です'});
-  const db=load();
-  const dbUser=db.users.find(x=>String(x.id)===String(req.user.id));
-  if(!dbUser)return res.status(401).json({error:'アカウントを確認できません'});
-  ensureUserSchoolIdentity(db,dbUser);
-  const talk=ensureTalk(db,dbUser,room);
-  if(!talk.memberIds.includes(dbUser.id))return res.status(403).json({error:'このトークのメンバーではありません'});
-  const text=String(req.body.text||'').trim();if(!text)return res.status(400).json({error:'メッセージを入力してください'});
-  const m=buildMessage(req,dbUser.id,null,talk.id,'group');
-  db.messages.push(m);talk.memberIds.filter(x=>x!==dbUser.id).forEach(uid=>notify(db,uid,'group_message',talk.name,`${dbUser.displayName}からメッセージが届きました`,{messageId:m.id,talkId:talk.id,room:talk.room,chatType:'talk'}));
-  save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:messagePublic(db,m),talkId:talk.id}))});res.json(messagePublic(db,m));
+app.post('/api/talks/:room/messages',auth,async(req,res)=>{
+  const room=String(req.params.room);
+  if(!['school','class','classadmin','gradeadmin'].includes(room))return res.status(400).json({error:'トーク種別が不正です'});
+  try{
+    const m=await withDbWrite(db=>{
+      const dbUser=db.users.find(x=>String(x.id)===String(req.user.id));
+      if(!dbUser)throw Object.assign(new Error('アカウントを確認できません'),{status:401});
+      ensureUserSchoolIdentity(db,dbUser);
+      const talk=ensureTalk(db,dbUser,room);
+      if(!talk.memberIds.includes(dbUser.id))throw Object.assign(new Error('このトークのメンバーではありません'),{status:403});
+      const text=String(req.body.text||'').trim();
+      if(!text&&!req.body.image&&!req.body.sticker)throw Object.assign(new Error('メッセージを入力してください'),{status:400});
+      const msg=buildMessage(req,dbUser.id,null,talk.id,'group');
+      db.messages.push(msg);
+      talk.memberIds.filter(x=>x!==dbUser.id).forEach(uid=>notify(db,uid,'group_message',talk.name,dbUser.displayName+'からメッセージが届きました',{messageId:msg.id,talkId:talk.id,room:talk.room,chatType:'talk'}));
+      return msg;
+    });
+    const payload=messagePublic(load(),m);
+    wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:payload,talkId:m.talkId}))});
+    res.json(payload);
+  }catch(e){res.status(e.status||400).json({error:e.message||'メッセージを送信できません'});}
 });
 function scope(req){return {schoolId:req.user.schoolId,grade:req.user.grade,className:req.user.className}}
 app.get('/api/class',auth,(req,res)=>{
@@ -380,17 +389,8 @@ app.post('/api/class/messages',auth,(req,res)=>{try{
   res.json(messagePublic(db,m));
 }catch(e){res.status(400).json({error:e.message||'メッセージを送信できません'});}
 });
-app.post('/api/class/read',auth,(req,res)=>{const db=load();const talk=db.classTalks.find(x=>x.schoolId===req.user.schoolId&&x.grade===req.user.grade&&x.className===req.user.className);if(talk)db.messages.filter(m=>!m.deleted&&m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
-app.post('/api/talks/:room/read',auth,(req,res)=>{
-  const db=load(),room=String(req.params.room),talk=ensureTalk(db,req.user,room);
-  const ids=db.talks.filter(t=>t.room===room&&String(t.schoolId)===String(req.user.schoolId)
-    &&(room==='gradeadmin'||String(t.grade||'')===String(req.user.grade))
-    &&(room==='gradeadmin'||String(t.className||'')===String(req.user.className))).map(t=>t.id);
-  if(!ids.includes(talk.id))ids.push(talk.id);
-  db.messages.filter(m=>!m.deleted&&ids.includes(m.talkId)&&m.from!==req.user.id).forEach(m=>{
-    m.readBy=Array.isArray(m.readBy)?m.readBy:[];
-    if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id);
-  });
+app.post('/api/class/read',auth,async(req,res)=>{try{await withDbWrite(db=>{const talk=(db.classTalks||[]).find(x=>x.schoolId===req.user.schoolId&&x.grade===req.user.grade&&x.className===req.user.className);if(talk)db.messages.filter(m=>!m.deleted&&m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)})});res.json({ok:true})}catch(e){res.status(500).json({error:'既読更新に失敗しました'})}});save(db);res.json({ok:true})});
+
   save(db);res.json({ok:true});
 });
 app.get('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.query.kind||'class';res.json(db.posts.filter(p=>p.kind===kind&&p.schoolId===s.schoolId&&(kind==='school'||p.grade===s.grade)&&(kind!=='class'||p.className===s.className)).slice(0,100))});
