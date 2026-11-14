@@ -30,7 +30,7 @@ function auth(req,res,next){
     const db=load();
     req.user=db.users.find(x=>x.id===p.id);
     if(!req.user||req.user.banned)throw 0;
-    ensureUserSchoolIdentity(db,req.user); save(db);
+    ensureUserSchoolIdentity(db,req.user);
     next();
   }catch{res.status(401).json({error:'認証が必要です'})}
 }
@@ -312,7 +312,6 @@ app.get('/api/talks/:room',auth,(req,res)=>{
   const room=String(req.params.room);
   if(!['school','class','classadmin','gradeadmin'].includes(room))return res.status(400).end();
   const db=load(),talk=ensureTalk(db,req.user,room);
-  save(db);
   const messages=db.messages.filter(m=>!m.deleted&&m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>messagePublic(db,m));
   res.json({talk,messages});
 });
