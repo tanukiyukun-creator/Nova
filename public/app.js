@@ -301,6 +301,7 @@ async function login(e){
 }
 async function go(v){view=v;await render(true)}
 async function route(){const m=$('#main');if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='settings')return settings(m);return home(m)}
+let chatPollTimer=null;
 let homeSelectedDate=new Date();
 let homeClockTimer=null;
 function homeDay(delta){
@@ -393,7 +394,25 @@ async function home(m){
 let chatRoom='class';
 let chatTarget=null;
 function resetChatForCurrentUser(){chatRoom='class';chatTarget=null;currentChat=null;friends=[];}
+async function refreshOpenChat(){
+  if(view!=='chat'||!$('#chatbox'))return;
+  try{
+    const room=chatRoom;
+    let fresh;
+    if(room==='friend'&&chatTarget)fresh=await chatHtml(chatTarget);
+    else if(room==='class'||room==='classadmin'||room==='gradeadmin'||room.startsWith('group:'))fresh=await groupChatHtml(room);
+    else return;
+    const box=$('#chatbox');
+    if(!box)return;
+    const nextIds=[...box.querySelectorAll('[data-message-id]')].map(x=>x.dataset.messageId).filter(Boolean).join(',');
+    const tmp=document.createElement('div');tmp.innerHTML=fresh;
+    const freshIds=[...tmp.querySelectorAll('[data-message-id]')].map(x=>x.dataset.messageId).filter(Boolean).join(',');
+    if(nextIds!==freshIds){const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<80;box.innerHTML=fresh;if(atBottom)scrollChatToBottom()}
+  }catch(e){console.warn('NOVA_CHAT_POLL_ERROR',e)}
+}
 async function chat(m){
+  if(chatPollTimer)clearInterval(chatPollTimer);
+  chatPollTimer=setInterval(()=>refreshOpenChat(),1500);
   wsConnect();
   const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(hasClientRole('CLASS_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
