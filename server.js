@@ -262,7 +262,6 @@ app.get('/api/talks',auth,(req,res)=>{
     if(!['class','classadmin','gradeadmin'].includes(room))return res.status(400).json({error:'トーク種別が不正です'});
     const db=load(),talk=ensureTalk(db,req.user,room);
     const messages=db.messages.filter(m=>m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>messagePublic(db,m));
-    save(db);
     res.json({talk,messages});
   }catch(e){res.status(500).json({error:e.message||'トークを取得できません'});}
 });
