@@ -17,8 +17,21 @@ const bookIconHtml=()=>'<span class="book-fallback" aria-hidden="true">▤</span
 const schoolIconHtml=()=>'<span class="school-fallback" aria-hidden="true">⌂</span>';
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 function toast(x){const d=document.createElement('div');d.className='toast';d.textContent=x;document.body.append(d);setTimeout(()=>d.remove(),2600)}
-function setSession(x){me=x.user;persistUser(me);localStorage.novaToken=x.token}
-function logout(){localStorage.removeItem('novaUser');localStorage.removeItem('novaToken');me=null;render()}
+function setSession(x){
+  // Always replace the previous browser account completely.
+  me=x.user;
+  friends=[];chatRoom='class';chatTarget=null;currentChat=null;
+  localStorage.removeItem('novaUserIcon');
+  persistUser(me);
+  localStorage.setItem('novaToken',x.token);
+}
+function clearNovaAccountState(){
+  localStorage.removeItem('novaUser');
+  localStorage.removeItem('novaUserIcon');
+  localStorage.removeItem('novaToken');
+  try{Object.keys(localStorage).filter(k=>k.startsWith('novaChatCache:')).forEach(k=>localStorage.removeItem(k))}catch{}
+}
+function logout(){clearNovaAccountState();me=null;friends=[];chatRoom='class';chatTarget=null;currentChat=null;view='home';render()}
 async function render(skipAuthRefresh=false){if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&hasClientRole('SUPER_ADMIN'))return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他'],...(hasClientRole('SUPER_ADMIN')?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',settings:'その他'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':profileFallbackHtml()}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
 async function renderSuperAdmin(){
   let state={users:[],schools:[],messages:[],friends:[],posts:[],events:[],tasks:[],schedules:[],elections:[],notifications:[],calls:[]};
@@ -376,6 +389,7 @@ async function home(m){
 }
 let chatRoom='class';
 let chatTarget=null;
+function resetChatForCurrentUser(){chatRoom='class';chatTarget=null;currentChat=null;friends=[];}
 async function chat(m){
   wsConnect();
   const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
