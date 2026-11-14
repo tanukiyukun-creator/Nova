@@ -638,3 +638,36 @@ button:active,.btn:active{transform:scale(.98)}
 .line-messages .message-cancel-btn{padding:3px 6px!important;font-size:9px!important;border-radius:6px!important;background:transparent!important;color:rgba(255,255,255,.58)!important;border:0!important;font-weight:500!important}
 .line-messages .bubble.mine .message-cancel-btn{color:rgba(35,31,22,.62)!important}
 .line-messages .message-cancel-btn:hover{background:rgba(255,255,255,.12)!important;color:inherit!important}
+
+/* Final LINE bubble isolation */
+.line-messages .bubble-row,
+.line-messages .bubble-row.mine,
+.line-messages .bubble-row:not(.mine){
+  background:transparent !important;
+  border:0 !important;
+  box-shadow:none !important;
+}
+.line-messages .bubble{
+  width:max-content !important;
+  max-width:min(100%,620px) !important;
+  box-sizing:border-box !important;
+  background:#20252d !important;
+  border-radius:20px !important;
+}
+.line-messages .bubble.mine{
+  width:max-content !important;
+  max-width:min(100%,620px) !important;
+  background:#cbb777 !important;
+  border-radius:20px !important;
+  overflow:hidden !important;
+}
+.line-messages .bubble.mine .message-actions{
+  background:transparent !important;
+}
+.line-messages .bubble.mine .message-cancel-btn{
+  background:transparent !important;
+  border:0 !important;
+  color:rgba(35,31,22,.62) !important;
+  padding:2px 4px !important;
+  font-size:9px !important;
+}
