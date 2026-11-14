@@ -357,7 +357,7 @@ async function home(m){
   daySchedule.sort((a,b)=>Number(a.period||0)-Number(b.period||0));
   const scheduleHtml=daySchedule.map(x=>`<div class="home-schedule-row"><span class="period">${esc(x.period)}限</span><div><b>${esc(x.subject||'授業')}</b><small>${esc(x.room||'')}</small></div></div>`).join('')||'<div class="home-empty">この日の時間割は未登録です</div>';
   const taskHtml=unfinished.map(t=>`<button class="home-task-row" onclick="go('schedule')"><span class="task-dot"></span><div><b>${esc(t.title||'課題')}</b><small>${esc(t.subject||'課題')} · ${homeFormatTaskDate(t)}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未完了の課題はありません</div>';
-  const chatHtml=unreadChats.map(n=>`<button class="home-unread-row" onclick="go('chat')"><span class="unread-dot"></span><div><b>${esc(n.title||'新しいメッセージ')}</b><small>${esc(n.body||'未読のメッセージがあります')}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未読のチャットはありません</div>';
+  const chatHtml=unreadChats.map(n=>`<button class="home-unread-row" onclick="openNotificationChat(${JSON.stringify(n)})"><span class="unread-dot"></span><div><b>${esc(n.title||'新しいメッセージ')}</b><small>${esc(n.body||'未読のメッセージがあります')}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未読のチャットはありません</div>';
   const noticeHtml=notices.map(n=>`<div class="home-notice-row"><span class="notice-mark">•</span><div><b>${esc(n.title||'お知らせ')}</b><small>${esc(n.body||'')}</small></div></div>`).join('')||'<div class="home-empty">新しいお知らせはありません</div>';
   m.innerHTML=`<div class="nova-home nova-home-compact">
     <section class="home-head glass">
@@ -582,6 +582,13 @@ async function groupChatHtml(room,fallbackMessage=null){
 }
 async function voteElection(electionId,candidateId){try{await api('/api/elections/'+electionId+'/vote',{method:'POST',body:JSON.stringify({candidateId})});toast('投票しました');await render(true)}catch(e){toast(e.message)}}
 async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
+async function openNotificationChat(n){
+  try{
+    if(n?.chatType==='direct'&&n.fromId){chatRoom='friend';chatTarget=n.fromId;await render(true);return}
+    if(n?.chatType==='talk'&&n.room){chatRoom=n.room;chatTarget=null;await render(true);return}
+  }catch(e){console.warn('NOVA_NOTIFICATION_CHAT_ERROR',e)}
+  chatRoom='class';chatTarget=null;await render(true)
+}
 function messageBubble(x){
   const mine=String(x.from||'')===String(me.id||'');
   const readCount=Number(x.readCount||0);
