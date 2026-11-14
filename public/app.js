@@ -495,13 +495,21 @@ async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)
 function messageBubble(x){
   const mine=String(x.from||'')===String(me.id||'');
   const read=mine&&Array.isArray(x.readBy)&&x.readBy.some(id=>id!==me.id);
+  const icon=x.fromIcon||'';
+  const avatar=icon?'<img class="chat-avatar" src="'+esc(icon)+'" alt="">':'<span class="chat-avatar-fallback" aria-hidden="true">●</span>';
   const reply=x.replyTo?'<div class="message-reply"><span>返信</span>'+esc(x.replyTo.text||'メッセージ')+'</div>':'';
-  if(x.deleted)return '<div class="bubble-row '+(mine?'mine':'')+'" data-message-id="'+esc(String(x.id||''))+'"><div class="bubble '+(mine?'mine':'')+' deleted"><div class="message-meta"><b>'+ (mine?'あなた':esc(x.fromName||'メンバー')) +'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span></div><div class="deleted-message">このメッセージは削除されました</div></div></div>';
+  const time='<span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span>';
+  const who='<b>'+(mine?'あなた':esc(x.fromName||'メンバー'))+'</b>';
+  if(x.deleted){
+    const bubble='<div class="bubble '+(mine?'mine':'')+'"><div class="message-meta">'+who+time+'</div><div class="deleted-message">このメッセージは削除されました</div></div>';
+    return '<div class="bubble-row '+(mine?'mine':'')+'" data-message-id="'+esc(String(x.id||''))+'">'+(mine?bubble+avatar:avatar+bubble)+'</div>';
+  }
   const image=x.image?'<img class="chat-image" src="'+esc(x.image)+'" onclick="openImage('+JSON.stringify(x.image)+')">':'';
   const text=x.text?'<div class="bubble-text">'+esc(x.text)+'</div>':'';
   const readLabel=mine?'<span class="read-status">'+(read?'既読':'未読')+'</span>':'';
   const deleteButton=mine&&x.id?'<button class="message-cancel-btn" type="button" data-message-id="'+esc(String(x.id))+'">送信取り消し</button>':'';
-  return '<div class="bubble-row '+(mine?'mine':'')+'" data-message-id="'+esc(String(x.id||''))+'"><div class="bubble '+(mine?'mine':'')+'"><div class="message-meta"><b>'+(mine?'あなた':esc(x.fromName||'メンバー'))+'</b><span>'+new Date(x.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</span>'+readLabel+'</div>'+reply+image+text+'<div class="message-actions"><button type="button" onclick="replyMessage('+JSON.stringify(JSON.stringify({id:x.id,text:x.text||'画像'}))+')">↩ 返信</button>'+deleteButton+'</div></div></div>';
+  const bubble='<div class="bubble '+(mine?'mine':'')+'"><div class="message-meta">'+who+time+readLabel+'</div>'+reply+image+text+'<div class="message-actions"><button type="button" onclick="replyMessage('+JSON.stringify(JSON.stringify({id:x.id,text:x.text||'画像'}))+')">↩ 返信</button>'+deleteButton+'</div></div>';
+  return '<div class="bubble-row '+(mine?'mine':'')+'" data-message-id="'+esc(String(x.id||''))+'">'+(mine?bubble+avatar:avatar+bubble)+'</div>';
 }
 async function deleteChatMessage(id2){
   if(!confirm('このメッセージの送信を取り消しますか？'))return;
