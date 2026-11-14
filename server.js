@@ -30,6 +30,7 @@ function auth(req,res,next){
     const db=load();
     req.user=db.users.find(x=>x.id===p.id);
     if(!req.user||req.user.banned)throw 0;
+    ensureUserSchoolIdentity(db,req.user); save(db);
     next();
   }catch{res.status(401).json({error:'認証が必要です'})}
 }
@@ -37,6 +38,8 @@ function pub(u){const {passwordHash,...x}=u; x.adminRoles=Array.isArray(u.adminR
 function hasRole(u,role){return u?.role===role||Array.isArray(u?.adminRoles)&&u.adminRoles.includes(role)}
 function notify(db,userId,type,title,body){db.notifications.unshift({id:id(),userId,type,title,body,read:false,createdAt:Date.now()});}
 function sameGroup(a,b){return a.schoolId===b.schoolId&&a.grade===b.grade&&a.className===b.className}
+function ensureUserSchoolIdentity(db,u){if(!u)return null;const name=String(u.schoolName||'').trim();if(!name)return u;let school=db.schools.find(x=>String(x.name||'').trim()===name);if(!school){school={id:id(),masterId:null,name,grades:[]};db.schools.push(school)}if(u.schoolId!==school.id)u.schoolId=school.id;u.schoolName=school.name;return u}
+
 
 app.get('/api/health',(q,r)=>r.json({ok:true,name:'Nova'}));
 const schoolCache={};
@@ -175,6 +178,7 @@ app.post('/api/login',(req,res)=>{
       return (xLast===lastName&&xFirst===firstName)||xDisplay===inputDisplayName;
     });
     if(!u)return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
+    ensureUserSchoolIdentity(db,u);
     ensureSuperAdminOwner(u,db);
     if(u.banned)return res.status(401).json({error:'このアカウントは利用停止中です'});
     if(!safeVerify(req.body.password,u.passwordHash))return res.status(401).json({error:'学校名・氏名・パスワードを確認してください'});
@@ -184,7 +188,7 @@ app.post('/api/login',(req,res)=>{
     res.status(500).json({error:'ログイン処理に失敗しました'});
   }
 });
-app.get('/api/me',auth,(req,res)=>{const db=load(),u=db.users.find(x=>x.id===req.user.id)||req.user;ensureSuperAdminOwner(u,db);res.json(pub(u));});
+app.get('/api/me',auth,(req,res)=>{const db=load(),u=db.users.find(x=>x.id===req.user.id)||req.user;ensureUserSchoolIdentity(db,u);ensureSuperAdminOwner(u,db);save(db);res.json(pub(u));});
 app.patch('/api/me',auth,(req,res)=>{
   try{
     const db=load(),u=db.users.find(x=>x.id===req.user.id);
@@ -200,9 +204,9 @@ app.patch('/api/me',auth,(req,res)=>{
       u.passwordHash=hash(String(req.body.newPassword));
     }
     Object.assign(u,{schoolName:nextSchool,grade:nextGrade,className:nextClass,lastName:nextLast,firstName:nextFirst,displayName:`${nextLast} ${nextFirst}`,icon:req.body.icon||u.icon,settings:{...u.settings,...(req.body.settings||{})}});
-    const school=db.schools.find(x=>x.id===u.schoolId||x.name===nextSchool);
-    if(school)u.schoolId=school.id;
-    else{const ns={id:id(),masterId:null,name:nextSchool,grades:[]};db.schools.push(ns);u.schoolId=ns.id;}
+    let school=db.schools.find(x=>String(x.name||'').trim()===nextSchool);
+    if(!school){school={id:id(),masterId:null,name:nextSchool,grades:[]};db.schools.push(school)}
+    u.schoolId=school.id;
     save(db);res.json(pub(u));
   }catch(e){console.error('ME_UPDATE_ERROR',e);res.status(500).json({error:'設定の保存に失敗しました'})}
 });
