@@ -321,7 +321,19 @@ app.get('/api/talks/:room',auth,(req,res)=>{
   if(!dbUser)return res.status(401).json({error:'アカウントを確認できません'});
   ensureUserSchoolIdentity(db,dbUser);
   const talk=ensureTalk(db,dbUser,room);
-  const messages=db.messages.filter(m=>!m.deleted&&m.type==='group'&&m.talkId===talk.id).slice(-200).map(m=>messagePublic(db,m));
+  // 過去に同じ学校・学年・クラスで重複作成されたトークがあっても、
+  // それらの履歴をまとめて現在のクラストークに表示する。
+  const matchingTalkIds=db.talks
+    .filter(t=>t.room===room&&String(t.schoolId)===String(dbUser.schoolId)
+      &&(room==='gradeadmin'||String(t.grade||'')===String(dbUser.grade))
+      &&(room==='gradeadmin'||String(t.className||'')===String(dbUser.className)))
+    .map(t=>t.id);
+  if(!matchingTalkIds.includes(talk.id))matchingTalkIds.push(talk.id);
+  const messages=db.messages
+    .filter(m=>!m.deleted&&m.type==='group'&&matchingTalkIds.includes(m.talkId))
+    .sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))
+    .slice(-200)
+    .map(m=>messagePublic(db,m));
   res.json({talk,messages});
 });
 app.post('/api/talks/:room/messages',auth,(req,res)=>{
@@ -368,7 +380,18 @@ app.post('/api/class/messages',auth,(req,res)=>{try{
 }catch(e){res.status(400).json({error:e.message||'メッセージを送信できません'});}
 });
 app.post('/api/class/read',auth,(req,res)=>{const db=load();const talk=db.classTalks.find(x=>x.schoolId===req.user.schoolId&&x.grade===req.user.grade&&x.className===req.user.className);if(talk)db.messages.filter(m=>!m.deleted&&m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
-app.post('/api/talks/:room/read',auth,(req,res)=>{const db=load();const talk=ensureTalk(db,req.user,String(req.params.room));db.messages.filter(m=>!m.deleted&&m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
+app.post('/api/talks/:room/read',auth,(req,res)=>{
+  const db=load(),room=String(req.params.room),talk=ensureTalk(db,req.user,room);
+  const ids=db.talks.filter(t=>t.room===room&&String(t.schoolId)===String(req.user.schoolId)
+    &&(room==='gradeadmin'||String(t.grade||'')===String(req.user.grade))
+    &&(room==='gradeadmin'||String(t.className||'')===String(req.user.className))).map(t=>t.id);
+  if(!ids.includes(talk.id))ids.push(talk.id);
+  db.messages.filter(m=>!m.deleted&&ids.includes(m.talkId)&&m.from!==req.user.id).forEach(m=>{
+    m.readBy=Array.isArray(m.readBy)?m.readBy:[];
+    if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id);
+  });
+  save(db);res.json({ok:true});
+});
 app.get('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.query.kind||'class';res.json(db.posts.filter(p=>p.kind===kind&&p.schoolId===s.schoolId&&(kind==='school'||p.grade===s.grade)&&(kind!=='class'||p.className===s.className)).slice(0,100))});
 app.post('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.body.kind||'class'; if(!canManage(req.user,kind))return res.status(403).json({error:'権限がありません'});const p={id:id(),...s,kind,title:req.body.title||'',body:req.body.body||'',authorId:req.user.id,createdAt:Date.now()};db.posts.unshift(p);save(db);res.json(p)});
 function canManage(u,kind){if(hasRole(u,'SUPER_ADMIN')||hasRole(u,'SCHOOL_ADMIN'))return true;if(kind==='grade')return hasRole(u,'GRADE_ADMIN');if(kind==='class')return hasRole(u,'CLASS_ADMIN')||hasRole(u,'GRADE_ADMIN');return false}
