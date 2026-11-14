@@ -383,6 +383,7 @@ async function chat(m){
   if(hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'gradeadmin',title:me.grade+'年 GRADE ADMIN',sub:'学年管理者',icon:'G'});
   if(!friends.length){try{friends=await api('/api/friends')}catch(e){friends=[];console.warn('friends load failed',e)}}
   let groups=[];try{groups=await api('/api/groups')}catch(e){groups=[];console.warn('groups load failed',e)}
+  let friendRequests={incoming:[],outgoing:[]};try{friendRequests=await api('/api/friend-requests')}catch(e){friendRequests={incoming:[],outgoing:[]};console.warn('friend requests load failed',e)}
   if(chatRoom==='school')chatRoom='class';
   if(!rooms.some(r=>r.id===chatRoom)&&!chatRoom.startsWith('group:')&&chatRoom!=='friend')chatRoom='class';
   const selectedFriend=chatRoom==='friend'&&chatTarget?friends.find(x=>x.id===chatTarget):null;
@@ -396,6 +397,7 @@ async function chat(m){
   const roomButton=r=>'<button class="line-room '+(chatRoom===r.id?'on':'')+'" onclick="selectChatRoom(\''+r.id+'\')"><span class="line-avatar">'+r.icon+'</span><span class="line-room-copy"><b>'+esc(r.title)+'</b><small>'+esc(r.sub)+'</small></span></button>';
   const groupButton=g=>'<button class="line-room '+(chatRoom==='group:'+g.id?'on':'')+'" onclick="selectChatRoom(\'group:'+g.id+'\')"><span class="line-avatar">G</span><span class="line-room-copy"><b>'+esc(g.name)+'</b><small>'+g.memberIds.length+'人</small></span></button>';
   const friendButton=f=>'<button class="line-room '+(chatRoom==='friend'&&chatTarget===f.id?'on':'')+'" onclick="openChat(\''+f.id+'\')">'+avatarHtml(f)+'<span class="line-room-copy"><b>'+esc(f.displayName)+'</b><small>個人チャット</small></span></button>';
+  const requestButton=x=>'<div class="line-friend-request"><div class="line-friend-request-user">'+avatarHtml(x.user)+'<span class="line-room-copy"><b>'+esc(x.user?.displayName||'メンバー')+'</b><small>フレンド申請</small></span></div><div class="line-friend-request-actions"><button onclick="acceptFriendRequest(\''+x.id+'\')">承認</button><button class="reject" onclick="rejectFriendRequest(\''+x.id+'\')">拒否</button></div></div>';
 function scrollChatToBottom(){
   const box=$('#chatbox');
   if(!box)return;
@@ -403,7 +405,7 @@ function scrollChatToBottom(){
   requestAnimationFrame(()=>{move();requestAnimationFrame(move)});
   box.querySelectorAll('img').forEach(img=>img.addEventListener('load',move,{once:true}));
 }
-  m.innerHTML='<div class="line-chat"><aside class="line-chat-list glass '+(mobileChatOpen?'mobile-hide':'')+'"><div class="line-list-head"><div><div class="eyebrow">NOVA</div><h2>トーク</h2></div><div class="line-head-actions"><button class="line-new friend-add-top" title="友達を追加" onclick="openFriendAdd()">友達追加</button><button class="line-new" title="グループ作成" onclick="createGroup()">＋</button></div></div><div class="line-search"><input class="input" placeholder="トーク・友達を検索" oninput="filterChatList(this.value)"></div><div id="lineRoomList"><div class="line-label">学校</div>'+rooms.map(roomButton).join('')+'<div class="line-label">グループ</div>'+(groups.map(groupButton).join('')||'<div class="line-empty">グループはありません</div>')+'<div class="line-label">友達</div>'+(friends.map(friendButton).join('')||'<div class="line-empty">友達を追加するとここに表示されます</div>')+'</div></aside><section class="line-chat-main glass '+(mobileChatOpen?'mobile-show':'')+'"><header class="line-header"><button class="line-back" onclick="closeMobileChat()">‹</button><div class="line-header-avatar">'+(selectedFriend?avatarHtml(selectedFriend):'<span class="line-avatar">'+(selectedGroup?'G':room?.icon||'C')+'</span>')+'</div><div class="line-header-name"><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div>'+'<div class="line-call">'+((room||selectedGroup)?'<button class="line-call-btn" title="所属メンバー" onclick="showTalkMembers()">👥</button>':'')+((chatRoom==='classadmin'||chatRoom==='gradeadmin')?'<button class="line-call-btn" title="管理者選出" onclick="startElectionPrompt(\''+chatRoom+'\')">投票</button>':'')+((selectedFriend||selectedGroup||room)?'<button class="line-call-btn" title="音声通話" onclick="startCall(\'audio\')">☎</button><button class="line-call-btn video" title="ビデオ通話" onclick="startCall(\'video\')">▣</button>':'')+'</div>'+'</header><div id="chatbox" class="line-messages">'+boxHtml+'</div>'+(canCompose?'<form class="line-compose" onsubmit="sendCurrentChat(event)"><label class="line-attach">＋<input type="file" accept="image/*" hidden onchange="sendImageFile(event)"></label><input id="chatText" class="line-input" name="text" placeholder="メッセージ" autocomplete="off"><button class="line-send" type="submit">➤</button></form>':'<div class="line-readonly">このトークにはメッセージを送信できません。</div>')+'</section></div>';
+  m.innerHTML='<div class="line-chat"><aside class="line-chat-list glass '+(mobileChatOpen?'mobile-hide':'')+'"><div class="line-list-head"><div><div class="eyebrow">NOVA</div><h2>トーク</h2></div><div class="line-head-actions"><button class="line-new friend-add-top" title="友達を追加" onclick="openFriendAdd()">友達追加</button><button class="line-new" title="グループ作成" onclick="createGroup()">＋</button></div></div><div class="line-search"><input class="input" placeholder="トーク・友達を検索" oninput="filterChatList(this.value)"></div><div id="lineRoomList"><div class="line-label">学校</div>'+rooms.map(roomButton).join('')+'<div class="line-label">グループ</div>'+(groups.map(groupButton).join('')||'<div class="line-empty">グループはありません</div>')+'<div class="line-label">友達</div>'+(friends.map(friendButton).join('')||'<div class="line-empty">友達を追加するとここに表示されます</div>')+(friendRequests.incoming.length?'<div class="line-label">フレンド申請 <span class="line-request-count">'+friendRequests.incoming.length+'</span></div>'+friendRequests.incoming.map(requestButton).join(''):'')+'</div></aside><section class="line-chat-main glass '+(mobileChatOpen?'mobile-show':'')+'"><header class="line-header"><button class="line-back" onclick="closeMobileChat()">‹</button><div class="line-header-avatar">'+(selectedFriend?avatarHtml(selectedFriend):'<span class="line-avatar">'+(selectedGroup?'G':room?.icon||'C')+'</span>')+'</div><div class="line-header-name"><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div>'+'<div class="line-call">'+((room||selectedGroup)?'<button class="line-call-btn" title="所属メンバー" onclick="showTalkMembers()">👥</button>':'')+((chatRoom==='classadmin'||chatRoom==='gradeadmin')?'<button class="line-call-btn" title="管理者選出" onclick="startElectionPrompt(\''+chatRoom+'\')">投票</button>':'')+((selectedFriend||selectedGroup||room)?'<button class="line-call-btn" title="音声通話" onclick="startCall(\'audio\')">☎</button><button class="line-call-btn video" title="ビデオ通話" onclick="startCall(\'video\')">▣</button>':'')+'</div>'+'</header><div id="chatbox" class="line-messages">'+boxHtml+'</div>'+(canCompose?'<form class="line-compose" onsubmit="sendCurrentChat(event)"><label class="line-attach">＋<input type="file" accept="image/*" hidden onchange="sendImageFile(event)"></label><input id="chatText" class="line-input" name="text" placeholder="メッセージ" autocomplete="off"><button class="line-send" type="submit">➤</button></form>':'<div class="line-readonly">このトークにはメッセージを送信できません。</div>')+'</section></div>';
   scrollChatToBottom();
 }
 async function showTalkMembers(){
@@ -438,13 +440,15 @@ async function searchFriendCandidates(){
 }
 async function addFriendFromSearch(id2){
   try{
-    await api('/api/friends/'+encodeURIComponent(id2),{method:'POST'});
-    toast('友達に追加しました');
+    const r=await api('/api/friends/'+encodeURIComponent(id2),{method:'POST'});
+    toast(r?.accepted?'友達に追加しました':'フレンド申請を送りました');
     friends=await api('/api/friends');
     await searchFriendCandidates();
     chat($('#main'));
-  }catch(e){toast(e.message||'友達追加に失敗しました')}
+  }catch(e){toast(e.message||'フレンド申請に失敗しました')}
 }
+async function acceptFriendRequest(id2){try{await api('/api/friend-requests/'+encodeURIComponent(id2)+'/accept',{method:'POST'});friends=await api('/api/friends');toast('友達に追加しました');chat($('#main'))}catch(e){toast(e.message||'申請を承認できません')}}
+async function rejectFriendRequest(id2){try{await api('/api/friend-requests/'+encodeURIComponent(id2)+'/reject',{method:'POST'});toast('フレンド申請を拒否しました');chat($('#main'))}catch(e){toast(e.message||'申請を拒否できません')}}
 function filterChatList(q){const s=String(q||'').trim().toLowerCase();document.querySelectorAll('#lineRoomList .line-room').forEach(b=>{b.style.display=!s||b.textContent.toLowerCase().includes(s)?'flex':'none'})}async function createGroup(){
   if(!friends.length)friends=await api('/api/friends');
   if(!friends.length)return toast('先に友達を追加してください');
