@@ -26,9 +26,11 @@ function setSession(x){
   localStorage.setItem('novaToken',x.token);try{sessionStorage.setItem('novaSessionToken',x.token)}catch{}
 }
 function clearNovaAccountState(){
+  let sessionToken='';try{sessionToken=sessionStorage.getItem('novaSessionToken')||''}catch{}
   localStorage.removeItem('novaUser');
   localStorage.removeItem('novaUserIcon');
-  try{sessionStorage.removeItem('novaSessionToken')}catch{};if(novaSessionToken()===localStorage.getItem('novaToken'))localStorage.removeItem('novaToken');
+  try{sessionStorage.removeItem('novaSessionToken')}catch{}
+  if(sessionToken&&sessionToken===localStorage.getItem('novaToken'))localStorage.removeItem('novaToken');
   // Chat history belongs to the account/server, so never delete chat caches on logout.
   // Caches are namespaced by user id and therefore cannot leak into another account.
 }
