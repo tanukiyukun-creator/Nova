@@ -220,7 +220,15 @@ function buildMessage(req,from,to,talkId,type){
 function messagePublic(db,m){
   const from=db.users.find(u=>u.id===m.from);
   const to=m.to?db.users.find(u=>u.id===m.to):null;
-  return {...m,fromName:from?.displayName||'メンバー',fromIcon:from?.icon||'',toName:to?.displayName||'メンバー',toIcon:to?.icon||''};
+  const readBy=Array.isArray(m.readBy)?m.readBy:[];
+  let readTotal=0;
+  if(m.to) readTotal=1;
+  else if(m.talkId){
+    const talk=(db.talks||[]).find(t=>t.id===m.talkId);
+    readTotal=Math.max(0,(talk?.memberIds||[]).filter(id=>id!==m.from).length);
+  }
+  const readCount=readTotal?readBy.filter(id=>id!==m.from&&(m.to?String(id)===String(m.to):true)).length:0;
+  return {...m,fromName:from?.displayName||'メンバー',fromIcon:from?.icon||'',toName:to?.displayName||'メンバー',toIcon:to?.icon||'',readCount,readTotal};
 }
 app.post('/api/chats/:otherId',auth,(req,res)=>{try{const db=load();if(!db.users.some(u=>u.id===req.params.otherId))return res.status(404).json({error:'相手が見つかりません'});const m=buildMessage(req,req.user.id,req.params.otherId,null,'direct');db.messages.push(m);notify(db,m.to,'message','新しいメッセージ',req.user.displayName+'からメッセージが届きました');save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message',message:messagePublic(db,m)}))});res.json(messagePublic(db,m))}catch(e){res.status(400).json({error:e.message})}});
 app.post('/api/chats/:otherId/read',auth,(req,res)=>{const db=load();db.messages.filter(m=>m.from===req.params.otherId&&m.to===req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)});save(db);res.json({ok:true})});
