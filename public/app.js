@@ -821,9 +821,16 @@ function mergeChatMessages(room,serverMessages,fallbackMessage=null){
   return result;
 }
 async function chatHtml(id2,fallbackMessage=null){
-  const ms=await api('/api/chats/'+encodeURIComponent(id2));
+  const cacheRoom='friend:'+String(id2);
+  let ms=[];
+  try{
+    ms=await api('/api/chats/'+encodeURIComponent(id2));
+  }catch(e){
+    console.warn('NOVA_DIRECT_HISTORY_FALLBACK',e);
+  }
+  // サーバー取得に失敗しても、直前までの会話を消さない。
+  const messages=mergeChatMessages(cacheRoom,Array.isArray(ms)?ms:[],fallbackMessage);
   try{await api('/api/chats/'+encodeURIComponent(id2)+'/read',{method:'POST'})}catch{}
-  const messages=mergeChatMessages('friend:'+id2,ms,fallbackMessage);
   return messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
 }
 async function school(m){
