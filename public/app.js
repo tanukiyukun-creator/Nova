@@ -498,29 +498,35 @@ async function searchFriendCandidates(){
       const pending=outgoingSet.has(String(u.id));
       const button=pending
         ? '<button class="friend-add-btn friend-add-sent" disabled>送信済み</button>'
-        : '<button class="friend-add-btn" onclick="addFriendFromSearch('+JSON.stringify(u.id)+')">追加</button>';
+        : '<button class="friend-add-btn" data-user-id="'+esc(String(u.id))+'" onclick="addFriendFromSearch('+JSON.stringify(u.id)+')">追加</button>';
       return '<div class="nova-member-row friend-candidate">'+avatarHtml(u)+'<div><b>'+esc(u.displayName||'メンバー')+'</b><small>'+esc((u.schoolName||'')+(u.grade?' · '+u.grade+'年':'')+(u.className?' '+u.className+'組':''))+'</small></div>'+button+'</div>';
     }).join('')||'<div class="line-empty">追加できるユーザーが見つかりません</div>';
   }catch(e){toast(e.message||'ユーザーを検索できません')}
 }
 async function addFriendFromSearch(id2){
-  const btns=[...document.querySelectorAll('.friend-add-btn')];
-  const btn=btns.find(b=>b.getAttribute('onclick')?.includes(String(id2)));
+  const targetId=String(id2);
+  const btn=[...document.querySelectorAll('.friend-candidate .friend-add-btn')].find(b=>b.dataset.userId===targetId);
   if(btn){btn.disabled=true;btn.textContent='送信中…';btn.classList.add('friend-add-sent')}
   try{
-    const r=await api('/api/friends/'+encodeURIComponent(id2),{method:'POST'});
-    toast(r?.accepted?'友達に追加しました':'フレンド申請を送りました');
-    if(btn){btn.textContent=r?.accepted?'追加済み':'送信済み';if(!r?.accepted)btn.classList.add('friend-add-sent')}
-    friends=await api('/api/friends');
-    if(!r?.accepted) return;
-    await searchFriendCandidates();
-    chat($('#main'));
+    const r=await api('/api/friends/'+encodeURIComponent(targetId),{method:'POST'});
+    if(r?.accepted){
+      if(btn)btn.textContent='追加済み';
+      toast('友達に追加しました');
+      try{friends=await api('/api/friends')}catch{}
+      await searchFriendCandidates();
+      chat($('#main'));
+      return;
+    }
+    if(btn){btn.textContent='送信済み';btn.disabled=true}
+    toast('フレンド申請を送りました');
+    try{friends=await api('/api/friends')}catch{}
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='追加';btn.classList.remove('friend-add-sent')}
     toast(e.message||'フレンド申請に失敗しました');
     console.error('NOVA_FRIEND_REQUEST_ERROR',e);
   }
 }
+
 async function acceptFriendRequest(id2){try{await api('/api/friend-requests/'+encodeURIComponent(id2)+'/accept',{method:'POST'});friends=await api('/api/friends');toast('友達に追加しました');chat($('#main'))}catch(e){toast(e.message||'申請を承認できません')}}
 async function rejectFriendRequest(id2){try{await api('/api/friend-requests/'+encodeURIComponent(id2)+'/reject',{method:'POST'});toast('フレンド申請を拒否しました');chat($('#main'))}catch(e){toast(e.message||'申請を拒否できません')}}
 function filterChatList(q){const s=String(q||'').trim().toLowerCase();document.querySelectorAll('#lineRoomList .line-room').forEach(b=>{b.style.display=!s||b.textContent.toLowerCase().includes(s)?'flex':'none'})}async function createGroup(){
