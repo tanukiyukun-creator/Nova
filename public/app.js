@@ -1,3 +1,21 @@
+async function chatHtml(id2,fallbackMessage=null){
+  // 個人トークの履歴はlocalStorageを正本にせず、毎回サーバーの保存履歴を正本として表示する。
+  let data;
+  try{
+    data=await api('/api/chats/'+encodeURIComponent(id2));
+  }catch(e){
+    console.error('NOVA_DIRECT_HISTORY_ERROR',e);
+    return '<div class="chat-empty-state"><span>!</span><b>トーク履歴を読み込めませんでした</b><small>'+esc(e.message||'通信エラー')+'</small></div>';
+  }
+  const messages=Array.isArray(data)?data:(Array.isArray(data?.messages)?data.messages:[]);
+  if(fallbackMessage?.id&&!messages.some(x=>String(x?.id)===String(fallbackMessage.id)))messages.push(fallbackMessage);
+  messages.sort((a,b)=>(Number(a?.createdAt)||0)-(Number(b?.createdAt)||0));
+  try{
+    writeChatCache(directChatCacheRoom(id2),messages);
+    await api('/api/chats/'+encodeURIComponent(id2)+'/read',{method:'POST'});
+  }catch{}
+  return messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
+}
 function novaSessionToken(){try{let t=sessionStorage.getItem('novaSessionToken');if(!t){t=localStorage.getItem('novaToken')||'';if(t)sessionStorage.setItem('novaSessionToken',t)}return t}catch{return localStorage.getItem('novaToken')||''}} const $=s=>document.querySelector(s), api=async(path,opt={})=>{const token=novaSessionToken();opt.headers={...(opt.headers||{}),'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})};const r=await fetch(path,opt);const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||'エラー');e.status=r.status;throw e}return j};
 let me=JSON.parse(localStorage.novaUser||'null'), view='home', friends=[], currentChat=null, books=[];
 try{const cachedIcon=localStorage.getItem('novaUserIcon');if(me&&!me.icon&&cachedIcon)me.icon=cachedIcon}catch{}
