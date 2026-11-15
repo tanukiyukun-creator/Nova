@@ -404,10 +404,26 @@ async function refreshOpenChat(){
     else return;
     const box=$('#chatbox');
     if(!box)return;
-    const nextIds=[...box.querySelectorAll('[data-message-id]')].map(x=>x.dataset.messageId).filter(Boolean).join(',');
-    const tmp=document.createElement('div');tmp.innerHTML=fresh;
-    const freshIds=[...tmp.querySelectorAll('[data-message-id]')].map(x=>x.dataset.messageId).filter(Boolean).join(',');
-    if(nextIds!==freshIds){const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<80;box.innerHTML=fresh;if(atBottom)scrollChatToBottom()}
+    // Polling must never remove a message that is already visible.
+    // A send can finish locally before another request sees the newly persisted row.
+    // Only append messages that are genuinely missing from the current DOM.
+    const tmp=document.createElement('div');
+    tmp.innerHTML=fresh;
+    const currentIds=new Set(
+      [...box.querySelectorAll('[data-message-id]')]
+        .map(x=>String(x.dataset.messageId||''))
+        .filter(Boolean)
+    );
+    const incoming=[...tmp.querySelectorAll('[data-message-id]')];
+    let added=false;
+    for(const row of incoming){
+      const id=String(row.dataset.messageId||'');
+      if(!id||currentIds.has(id))continue;
+      box.insertAdjacentHTML('beforeend',row.outerHTML);
+      currentIds.add(id);
+      added=true;
+    }
+    if(added)scrollChatToBottom();
   }catch(e){console.warn('NOVA_CHAT_POLL_ERROR',e)}
 }
 async function chat(m){
