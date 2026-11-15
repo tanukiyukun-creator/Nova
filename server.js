@@ -223,7 +223,7 @@ app.get('/api/chats/:otherId',auth,(req,res)=>{try{
   const db=load(),meId=String(req.user.id),otherId=String(req.params.otherId);
   if(!db.users.some(u=>String(u.id)===otherId))return res.status(404).json({error:'相手が見つかりません'});
   const list=db.messages
-    .filter(m=>!m.deleted&&((String(m.from)===meId&&String(m.to)===otherId)||(String(m.from)===otherId&&String(m.to)===meId))&&!m.talkId)
+    .filter(m=>!m.deleted&&((String(m.from)===meId&&String(m.to)===otherId)||(String(m.from)===otherId&&String(m.to)===meId)))
     .sort((a,b)=>(Number(a.createdAt)||0)-(Number(b.createdAt)||0))
     .map(m=>messagePublic(db,m));
   res.json({messages:list});
