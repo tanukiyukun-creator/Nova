@@ -836,14 +836,15 @@ function mergeChatMessages(room,serverMessages,fallbackMessage=null){
 async function chatHtml(id2,fallbackMessage=null){
   const cacheRoom=directChatCacheRoom(id2);
   migrateLegacyDirectChatCache(id2);
-  let ms=[];
+  let data;
   try{
-    ms=await api('/api/chats/'+encodeURIComponent(id2));
+    data=await api('/api/chats/'+encodeURIComponent(id2));
   }catch(e){
-    console.warn('NOVA_DIRECT_HISTORY_FALLBACK',e);
+    console.error('NOVA_DIRECT_HISTORY_ERROR',e);
+    return '<div class="chat-empty-state"><span>!</span><b>トーク履歴を読み込めませんでした</b><small>'+esc(e.message||'通信エラー')+'</small></div>';
   }
-  // サーバー取得に失敗しても、直前までの会話を消さない。
-  const messages=mergeChatMessages(cacheRoom,Array.isArray(ms)?ms:[],fallbackMessage);
+  const ms=Array.isArray(data)?data:(Array.isArray(data?.messages)?data.messages:[]);
+  const messages=mergeChatMessages(cacheRoom,ms,fallbackMessage);
   try{await api('/api/chats/'+encodeURIComponent(id2)+'/read',{method:'POST'})}catch{}
   return messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
 }
