@@ -219,7 +219,16 @@ app.get('/api/friends',auth,(req,res)=>{const db=load();const ids=db.friends.fil
 app.get('/api/friend-requests',auth,(req,res)=>{const db=load();const incoming=(db.friendRequests||[]).filter(x=>x.to===req.user.id).map(x=>({...x,user:pub(db.users.find(u=>u.id===x.from))}));const outgoing=(db.friendRequests||[]).filter(x=>x.from===req.user.id).map(x=>({...x,user:pub(db.users.find(u=>u.id===x.to))}));res.json({incoming,outgoing})});
 app.post('/api/friend-requests/:id/accept',auth,(req,res)=>{const db=load();const x=(db.friendRequests||[]).find(x=>x.id===req.params.id&&x.to===req.user.id);if(!x)return res.status(404).json({error:'申請が見つかりません'});if(!db.friends.some(f=>(f.a===x.from&&f.b===x.to)||(f.a===x.to&&f.b===x.from)))db.friends.push({a:x.from,b:x.to,createdAt:Date.now()});db.friendRequests=db.friendRequests.filter(y=>y.id!==x.id);save(db);res.json({ok:true})});
 app.post('/api/friend-requests/:id/reject',auth,(req,res)=>{const db=load();const x=(db.friendRequests||[]).find(x=>x.id===req.params.id&&x.to===req.user.id);if(!x)return res.status(404).json({error:'申請が見つかりません'});db.friendRequests=db.friendRequests.filter(y=>y.id!==x.id);save(db);res.json({ok:true})});
-app.get('/api/chats/:otherId',auth,(req,res)=>{const db=load();const meId=String(req.user.id),otherId=String(req.params.otherId);const list=db.messages.filter(m=>!m.deleted&&((String(m.from)===meId&&String(m.to)===otherId)||(String(m.from)===otherId&&String(m.to)===meId))).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).slice(-200).map(m=>messagePublic(db,m));res.json(list)});
+app.get('/api/chats/:otherId',auth,(req,res)=>{try{
+  const db=load(),meId=String(req.user.id),otherId=String(req.params.otherId);
+  if(!db.users.some(u=>String(u.id)===otherId))return res.status(404).json({error:'相手が見つかりません'});
+  const list=db.messages
+    .filter(m=>!m.deleted&&String(m.type||'')==='direct'&&((String(m.from)===meId&&String(m.to)===otherId)||(String(m.from)===otherId&&String(m.to)===meId)))
+    .sort((a,b)=>(Number(a.createdAt)||0)-(Number(b.createdAt)||0))
+    .slice(-200)
+    .map(m=>messagePublic(db,m));
+  res.json({messages:list});
+}catch(e){res.status(500).json({error:'トーク履歴を取得できません'});}});
 function buildMessage(req,from,to,talkId,type){
   const text=String(req.body.text||'').trim(),image=String(req.body.image||''),sticker=String(req.body.sticker||'');
   if(!text&&!image&&!sticker)throw new Error('メッセージが空です');
@@ -239,7 +248,24 @@ function messagePublic(db,m){
   const readCount=readTotal?readBy.filter(id=>id!==m.from&&(m.to?String(id)===String(m.to):true)).length:0;
   return {...m,fromName:from?.displayName||'メンバー',fromIcon:from?.icon||'',toName:to?.displayName||'メンバー',toIcon:to?.icon||'',readCount,readTotal};
 }
-app.post('/api/chats/:otherId',auth,async(req,res)=>{try{const m=await withDbWrite(db=>{const sender=db.users.find(u=>u.id===req.user.id)||req.user;if(!db.users.some(u=>u.id===req.params.otherId))throw Object.assign(new Error('相手が見つかりません'),{status:404});const msg=buildMessage(req,sender.id,req.params.otherId,null,'direct');db.messages.push(msg);notify(db,msg.to,'message','新しいメッセージ',sender.displayName+'からメッセージが届きました',{messageId:msg.id,fromId:msg.from,toId:msg.to,chatType:'direct'});return msg});const payload=messagePublic(load(),m);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message',message:payload}))});res.json(payload)}catch(e){res.status(e.status||400).json({error:e.message})}});
+app.post('/api/chats/:otherId',auth,async(req,res)=>{try{
+  const targetId=String(req.params.otherId);
+  const m=await withDbWrite(db=>{
+    const sender=db.users.find(u=>String(u.id)===String(req.user.id));
+    if(!sender)throw Object.assign(new Error('送信者が見つかりません'),{status:401});
+    const target=db.users.find(u=>String(u.id)===targetId);
+    if(!target)throw Object.assign(new Error('相手が見つかりません'),{status:404});
+    const msg=buildMessage(req,sender.id,target.id,null,'direct');
+    db.messages.push(msg);
+    notify(db,target.id,'message','新しいメッセージ',sender.displayName+'からメッセージが届きました',{messageId:msg.id,fromId:sender.id,toId:target.id,chatType:'direct'});
+    return msg;
+  });
+  const persisted=load().messages.some(x=>String(x.id)===String(m.id)&&!x.deleted);
+  if(!persisted)throw Object.assign(new Error('メッセージの保存を確認できませんでした'),{status:500});
+  const payload=messagePublic(load(),m);
+  wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message',message:payload}))});
+  res.json(payload);
+}catch(e){res.status(e.status||400).json({error:e.message||'メッセージを送信できません'})}});
 app.post('/api/chats/:otherId/read',auth,async(req,res)=>{try{await withDbWrite(db=>{db.messages.filter(m=>m.from===req.params.otherId&&m.to===req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)})});res.json({ok:true})}catch(e){res.status(500).json({error:'既読更新に失敗しました'})}});
 app.post('/api/messages/:id/delete',auth,(req,res)=>{const db=load(),m=db.messages.find(x=>x.id===req.params.id);if(!m)return res.status(404).json({error:'メッセージが見つかりません'});if(m.from!==req.user.id)return res.status(403).json({error:'自分のメッセージのみ送信取り消しできます'});db.messages=db.messages.filter(x=>x.id!==m.id);save(db);wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message_deleted',messageId:m.id}))});res.json({ok:true});});
 app.post('/api/talks/:room/read',auth,async(req,res)=>{const room=String(req.params.room);if(!['class','classadmin','gradeadmin'].includes(room))return res.status(400).json({error:'トーク種別が不正です'});try{await withDbWrite(db=>{const talk=ensureTalk(db,req.user,room);if(!talk.memberIds.includes(req.user.id))throw Object.assign(new Error('このトークのメンバーではありません'),{status:403});const ids=db.talks.filter(t=>t.room===room&&String(t.schoolId)===String(req.user.schoolId)&&(room==='gradeadmin'||String(t.grade||'')===String(req.user.grade))&&(room==='gradeadmin'||String(t.className||'')===String(req.user.className))).map(t=>t.id);if(!ids.includes(talk.id))ids.push(talk.id);db.messages.filter(m=>!m.deleted&&ids.includes(m.talkId)&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)})});res.json({ok:true})}catch(e){res.status(e.status||500).json({error:e.message||'既読更新に失敗しました'})}});
