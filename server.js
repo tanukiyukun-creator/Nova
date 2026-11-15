@@ -237,9 +237,17 @@ app.post('/api/friend-requests/:id/reject',auth,(req,res)=>{const db=load();cons
 app.get('/api/chats/:otherId',auth,(req,res)=>{try{
   const db=load(),meId=String(req.user.id),otherId=String(req.params.otherId);
   if(!db.users.some(u=>String(u.id)===otherId))return res.status(404).json({error:'相手が見つかりません'});
-  const list=migrateDirectMessages()
-    .filter(m=>!m.deleted&&((String(m.from)===meId&&String(m.to)===otherId)||(String(m.from)===otherId&&String(m.to)===meId)))
+  // 個人トークはDBと専用ストアの両方を読む。片方への書き込みが一時的に遅れても履歴を欠落させない。
+  const rows=[...(db.messages||[]),...migrateDirectMessages()];
+  const unique=new Map();
+  for(const m of rows){
+    if(!m||m.deleted||m.type!=='direct')continue;
+    if(!((String(m.from)===meId&&String(m.to)===otherId)||(String(m.from)===otherId&&String(m.to)===meId)))continue;
+    unique.set(String(m.id),m);
+  }
+  const list=[...unique.values()]
     .sort((a,b)=>(Number(a.createdAt)||0)-(Number(b.createdAt)||0))
+    .slice(-200)
     .map(m=>messagePublic(db,m));
   res.json({messages:list});
 }catch(e){res.status(500).json({error:'トーク履歴を取得できません'});}});
@@ -284,10 +292,21 @@ app.post('/api/chats/:otherId',auth,async(req,res)=>{try{
   res.json(payload);
 }catch(e){res.status(e.status||400).json({error:e.message||'メッセージを送信できません'})}});
 app.post('/api/chats/:otherId/read',auth,async(req,res)=>{try{
+  const db=load();
   const rows=loadDirectMessages();
   let changed=false;
-  rows.forEach(m=>{if(String(m.from)===String(req.params.otherId)&&String(m.to)===String(req.user.id)){m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.some(x=>String(x)===String(req.user.id))){m.readBy.push(req.user.id);changed=true}}});
-  if(changed)saveDirectMessages(rows);
+  const mark=(m)=>{
+    if(String(m.from)===String(req.params.otherId)&&String(m.to)===String(req.user.id)){
+      m.readBy=Array.isArray(m.readBy)?m.readBy:[];
+      if(!m.readBy.some(x=>String(x)===String(req.user.id))){m.readBy.push(req.user.id);changed=true}
+    }
+  };
+  rows.forEach(mark);
+  (db.messages||[]).forEach(m=>{if(m.type==='direct')mark(m)});
+  if(changed){
+    saveDirectMessages(rows);
+    save(db);
+  }
   res.json({ok:true});
 }catch(e){res.status(500).json({error:'既読更新に失敗しました'})}});
 app.post('/api/messages/:id/delete',auth,(req,res)=>{const db=load();const m=db.messages.find(x=>x.id===req.params.id)||loadDirectMessages().find(x=>x.id===req.params.id);if(!m)return res.status(404).json({error:'メッセージが見つかりません'});if(String(m.from)!==String(req.user.id))return res.status(403).json({error:'自分のメッセージのみ送信取り消しできます'});if(m.type==='direct'){const rows=loadDirectMessages().filter(x=>x.id!==m.id);saveDirectMessages(rows);db.messages=db.messages.filter(x=>x.id!==m.id);save(db)}else{db.messages=db.messages.filter(x=>x.id!==m.id);save(db)}wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message_deleted',messageId:m.id}))});res.json({ok:true});});
