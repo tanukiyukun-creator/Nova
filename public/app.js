@@ -486,10 +486,21 @@ async function searchFriendCandidates(){
   const q=String($('#friendSearchInput')?.value||'').trim();
   if(!q){$('#friendCandidates').innerHTML='<div class="line-empty">検索すると候補が表示されます</div>';return}
   try{
-    const us=await api('/api/users/search?q='+encodeURIComponent(q));
-    const friendsSet=new Set((await api('/api/friends')).map(x=>x.id));
-    const list=us.filter(u=>u.id!==me.id&&!friendsSet.has(u.id));
-    $('#friendCandidates').innerHTML=list.map(u=>'<div class="nova-member-row friend-candidate">'+avatarHtml(u)+'<div><b>'+esc(u.displayName||'メンバー')+'</b><small>'+esc((u.schoolName||'')+(u.grade?' · '+u.grade+'年':'')+(u.className?' '+u.className+'組':''))+'</small></div><button class="friend-add-btn" onclick="addFriendFromSearch('+JSON.stringify(u.id)+')">追加</button></div>').join('')||'<div class="line-empty">追加できるユーザーが見つかりません</div>';
+    const [us,friendList,requests]=await Promise.all([
+      api('/api/users/search?q='+encodeURIComponent(q)),
+      api('/api/friends'),
+      api('/api/friend-requests')
+    ]);
+    const friendsSet=new Set(friendList.map(x=>String(x.id)));
+    const outgoingSet=new Set((requests.outgoing||[]).map(x=>String(x.user?.id||x.to)));
+    const list=us.filter(u=>u.id!==me.id&&!friendsSet.has(String(u.id)));
+    $('#friendCandidates').innerHTML=list.map(u=>{
+      const pending=outgoingSet.has(String(u.id));
+      const button=pending
+        ? '<button class="friend-add-btn friend-add-sent" disabled>送信済み</button>'
+        : '<button class="friend-add-btn" onclick="addFriendFromSearch('+JSON.stringify(u.id)+')">追加</button>';
+      return '<div class="nova-member-row friend-candidate">'+avatarHtml(u)+'<div><b>'+esc(u.displayName||'メンバー')+'</b><small>'+esc((u.schoolName||'')+(u.grade?' · '+u.grade+'年':'')+(u.className?' '+u.className+'組':''))+'</small></div>'+button+'</div>';
+    }).join('')||'<div class="line-empty">追加できるユーザーが見つかりません</div>';
   }catch(e){toast(e.message||'ユーザーを検索できません')}
 }
 async function addFriendFromSearch(id2){
@@ -498,7 +509,7 @@ async function addFriendFromSearch(id2){
     toast(r?.accepted?'友達に追加しました':'フレンド申請を送りました');
     friends=await api('/api/friends');
     await searchFriendCandidates();
-    chat($('#main'));
+    if(r?.accepted)chat($('#main'));
   }catch(e){toast(e.message||'フレンド申請に失敗しました')}
 }
 async function acceptFriendRequest(id2){try{await api('/api/friend-requests/'+encodeURIComponent(id2)+'/accept',{method:'POST'});friends=await api('/api/friends');toast('友達に追加しました');chat($('#main'))}catch(e){toast(e.message||'申請を承認できません')}}
