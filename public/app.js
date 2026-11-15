@@ -829,7 +829,7 @@ function mergeChatMessages(room,serverMessages,fallbackMessage=null){
     const key=String(fallbackMessage.id);
     map.set(key,{...(map.get(key)||{}),...fallbackMessage});
   }
-  const result=[...map.values()].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).slice(-200);
+  const result=[...map.values()].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
   writeChatCache(room,result);
   return result;
 }
