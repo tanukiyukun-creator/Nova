@@ -225,7 +225,6 @@ app.get('/api/chats/:otherId',auth,(req,res)=>{try{
   const list=db.messages
     .filter(m=>!m.deleted&&((String(m.from)===meId&&String(m.to)===otherId)||(String(m.from)===otherId&&String(m.to)===meId))&&!m.talkId)
     .sort((a,b)=>(Number(a.createdAt)||0)-(Number(b.createdAt)||0))
-    .slice(-200)
     .map(m=>messagePublic(db,m));
   res.json({messages:list});
 }catch(e){res.status(500).json({error:'トーク履歴を取得できません'});}});
@@ -236,8 +235,8 @@ function buildMessage(req,from,to,talkId,type){
   return {id:id(),type,from,to:to||null,talkId:talkId||null,text,image,sticker,replyTo:req.body.replyTo||null,createdAt:Date.now(),readBy:[]};
 }
 function messagePublic(db,m){
-  const from=db.users.find(u=>u.id===m.from);
-  const to=m.to?db.users.find(u=>u.id===m.to):null;
+  const from=db.users.find(u=>String(u.id)===String(m.from));
+  const to=m.to?db.users.find(u=>String(u.id)===String(m.to)):null;
   const readBy=Array.isArray(m.readBy)?m.readBy:[];
   let readTotal=0;
   if(m.to) readTotal=1;
