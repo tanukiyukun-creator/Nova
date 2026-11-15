@@ -673,7 +673,7 @@ async function deleteChatMessage(id2){
 document.addEventListener('click',e=>{const b=e.target.closest?.('.message-cancel-btn');if(!b)return;e.preventDefault();e.stopPropagation();deleteChatMessage(b.dataset.messageId)});
 function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
 function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
-function wsConnect(){if(!me)return;const token=novaSessionToken();if(window.novaWs?.readyState===WebSocket.OPEN&&window.novaWsToken===token)return;if(window.novaWs){try{window.novaWs.close()}catch{}window.novaWs=null}try{const p=location.protocol==='https:'?'wss':'ws';window.novaWsToken=token;window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(token));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}if(x.type==='friend_request'){toast((x.request?.fromName||'相手')+'からフレンド申請が届きました');if(view==='chat')chat($('#main'));return}if(x.type==='friend_accepted'){toast((x.user?.displayName||'相手')+'がフレンド申請を承認しました');friends=api('/api/friends').catch(()=>friends);if(view==='chat')chat($('#main'));return}const box=$('#chatbox');if(x.type==='message_deleted'){if(!box)return;const row=box.querySelector('[data-message-id="'+CSS.escape(String(x.messageId||''))+'"]');if(row)row.remove();try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k?.startsWith('novaChatCache:'))continue;const arr=JSON.parse(localStorage.getItem(k)||'[]');if(Array.isArray(arr))localStorage.setItem(k,JSON.stringify(arr.filter(m=>String(m?.id||'')!==String(x.messageId||''))))}}catch{}return}if(view!=='chat'||!x.message||!['message','group_message','class_message'].includes(x.type))return;const id=String(x.message.id||'');if(!id)return;const cacheRoom=x.type==='message'?'friend:'+String(String(x.message.from)===String(me.id)?x.message.to:x.message.from):(x.message.talkId?((x.type==='group_message')?'group:'+String(x.message.talkId):'class'):chatRoom);mergeChatMessages(cacheRoom,[],x.message);if(!box)return;if(box.querySelector('[data-message-id="'+CSS.escape(id)+'"]'))return;const empty=box.querySelector('.chat-empty-state');if(empty)box.innerHTML=messageBubble(x.message);else box.insertAdjacentHTML('beforeend',messageBubble(x.message));box.scrollTop=box.scrollHeight}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;window.novaWsToken='';setTimeout(()=>me&&novaSessionToken()&&wsConnect(),2000)}}catch{}}function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
+function wsConnect(){if(!me)return;const token=novaSessionToken();if(window.novaWs?.readyState===WebSocket.OPEN&&window.novaWsToken===token)return;if(window.novaWs){try{window.novaWs.close()}catch{}window.novaWs=null}try{const p=location.protocol==='https:'?'wss':'ws';window.novaWsToken=token;window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(token));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}if(x.type==='friend_request'){toast((x.request?.fromName||'相手')+'からフレンド申請が届きました');if(view==='chat')chat($('#main'));return}if(x.type==='friend_accepted'){toast((x.user?.displayName||'相手')+'がフレンド申請を承認しました');friends=api('/api/friends').catch(()=>friends);if(view==='chat')chat($('#main'));return}const box=$('#chatbox');if(x.type==='message_deleted'){if(!box)return;const row=box.querySelector('[data-message-id="'+CSS.escape(String(x.messageId||''))+'"]');if(row)row.remove();try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k?.startsWith('novaChatCache:'))continue;const arr=JSON.parse(localStorage.getItem(k)||'[]');if(Array.isArray(arr))localStorage.setItem(k,JSON.stringify(arr.filter(m=>String(m?.id||'')!==String(x.messageId||''))))}}catch{}return}if(view!=='chat'||!x.message||!['message','group_message','class_message'].includes(x.type))return;const id=String(x.message.id||'');if(!id)return;const cacheRoom=x.type==='message'?directChatCacheRoom(String(x.message.from)===String(me.id)?x.message.to:x.message.from):(x.message.talkId?((x.type==='group_message')?'group:'+String(x.message.talkId):'class'):chatRoom);mergeChatMessages(cacheRoom,[],x.message);if(!box)return;if(box.querySelector('[data-message-id="'+CSS.escape(id)+'"]'))return;const empty=box.querySelector('.chat-empty-state');if(empty)box.innerHTML=messageBubble(x.message);else box.insertAdjacentHTML('beforeend',messageBubble(x.message));box.scrollTop=box.scrollHeight}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;window.novaWsToken='';setTimeout(()=>me&&novaSessionToken()&&wsConnect(),2000)}}catch{}}function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
 let novaPeers={},novaStream=null,novaTargets=[],novaMode=null,novaRoomKey=null,novaCallId=null;
 function callScope(){
   if(chatRoom==='friend')return {scope:'friend',ids:chatTarget?[chatTarget]:[]};
@@ -779,7 +779,7 @@ async function sendCurrentChat(e,extra={}){
     // サーバーが返したメッセージだけをID単位で追加し、履歴の再描画は行わない。
     const box=$('#chatbox');
     if(sent?.id){
-      const cacheRoom=chatRoom==='friend'&&chatTarget?'friend:'+chatTarget:chatRoom;
+      const cacheRoom=chatRoom==='friend'&&chatTarget?directChatCacheRoom(chatTarget):chatRoom;
       mergeChatMessages(cacheRoom,[],sent);
       if(box&&!box.querySelector('[data-message-id="'+CSS.escape(String(sent.id))+'"]')){
         const empty=box.querySelector('.chat-empty-state');
@@ -796,9 +796,22 @@ async function sendCurrentChat(e,extra={}){
     toast('送信できません: '+(x?.message||'通信エラー')+(x?.status?' ['+x.status+']':''));
   }
 }
+function directChatCacheRoom(id2){
+  const a=String(me?.id||'guest'),b=String(id2||'');
+  return 'friend:'+([a,b].sort().join(':'));
+}
 function chatCacheKey(room){return 'novaChatCache:'+String(me?.id||'guest')+':'+String(room||'');}
 function readChatCache(room){
   try{const x=JSON.parse(localStorage.getItem(chatCacheKey(room))||'[]');return Array.isArray(x)?x:[]}catch{return []}
+}
+function migrateLegacyDirectChatCache(id2){
+  const canonical=directChatCacheRoom(id2);
+  const current=readChatCache(canonical);
+  if(current.length)return current;
+  const legacy='friend:'+String(id2);
+  const old=readChatCache(legacy);
+  if(old.length)writeChatCache(canonical,old);
+  return old;
 }
 function writeChatCache(room,messages){
   try{localStorage.setItem(chatCacheKey(room),JSON.stringify((messages||[]).filter(x=>x&&x.id).slice(-200)))}catch{}
@@ -821,7 +834,8 @@ function mergeChatMessages(room,serverMessages,fallbackMessage=null){
   return result;
 }
 async function chatHtml(id2,fallbackMessage=null){
-  const cacheRoom='friend:'+String(id2);
+  const cacheRoom=directChatCacheRoom(id2);
+  migrateLegacyDirectChatCache(id2);
   let ms=[];
   try{
     ms=await api('/api/chats/'+encodeURIComponent(id2));
