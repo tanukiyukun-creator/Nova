@@ -653,7 +653,7 @@ async function groupChatHtml(room,fallbackMessage=null){
   const messages=mergeChatMessages(room,data?.messages,fallbackMessage);
   try{if(room==='friend'&&chatTarget)await api('/api/chats/'+encodeURIComponent(chatTarget)+'/read',{method:'POST'});else if(room==='class'||room==='classadmin'||room==='gradeadmin')await api('/api/talks/'+encodeURIComponent(room)+'/read',{method:'POST'});else if(room.startsWith('group:'))await api('/api/groups/'+encodeURIComponent(room.slice(6))+'/read',{method:'POST'})}catch{}
   let html=messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
-  if(room==='classadmin'||room==='gradeadmin'){
+  if(room==='class'||room==='classadmin'||room==='gradeadmin'){
     try{
       const elections=await api('/api/elections');
       const active=elections.filter(e=>e.status==='OPEN'&&e.endsAt>Date.now());
