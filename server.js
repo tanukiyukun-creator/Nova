@@ -112,9 +112,9 @@ app.get('/api/schools',async(req,res)=>{
 app.post('/api/register',(req,res)=>{
   try{
     const db=load();
-    const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon}=req.body;
+    const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon,legalConsent,legalVersion}=req.body;
     const displayName=[lastName,firstName].filter(Boolean).join(' ').trim();
-    if(!schoolName||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});
+    if(!schoolName||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});\n    if(!legalConsent)return res.status(400).json({error:'利用規約・プライバシーポリシーへの同意が必要です'});
     if(!['1','2','3'].includes(String(grade)))return res.status(400).json({error:'学年は1〜3から選択してください'});
     if(!/^\d+$/.test(String(attendanceNo))||Number(attendanceNo)<1)return res.status(400).json({error:'出席番号は1以上の数字で入力してください'});
     if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});
@@ -130,7 +130,7 @@ app.post('/api/register',(req,res)=>{
     const exists=db.users.find(u=>u.schoolId===school.id&&u.grade===String(grade)&&u.className===normalizedClass&&String(u.attendanceNo)===String(attendanceNo));
     if(exists)return res.status(409).json({error:'この学校・学年・クラス・出席番号はすでに登録されています'});
     const ownerMatch=normalizeAdminIdentity(school.name).includes('山村学園')&&normalizeAdminIdentity(lastName)==='谷利'&&normalizeAdminIdentity(firstName)==='優樹';
-    const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:normalizedClass,attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:ownerMatch?'SUPER_ADMIN':'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true}};
+    const u={id:id(),schoolId:school.id,schoolName:school.name,grade:String(grade),className:normalizedClass,attendanceNo:String(attendanceNo),lastName:String(lastName).trim(),firstName:String(firstName).trim(),displayName,icon:icon||'',passwordHash:hash(password),role:ownerMatch?'SUPER_ADMIN':'STUDENT',createdAt:Date.now(),settings:{notifications:true,callSound:true},legalConsentAt:Date.now(),legalVersion:String(legalVersion||'1.0')};
     db.users.push(u);
     if(!Array.isArray(db.classTalks))db.classTalks=[];
     let talk=db.classTalks.find(x=>x.schoolId===school.id&&x.grade===String(grade)&&x.className===normalizedClass);
