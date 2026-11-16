@@ -438,7 +438,7 @@ app.get('/api/talks/:room',auth,(req,res)=>{
     .map(t=>t.id);
   if(!matchingTalkIds.includes(talk.id))matchingTalkIds.push(talk.id);
   const messages=db.messages
-    .filter(m=>!m.deleted&&m.type==='group'&&matchingTalkIds.includes(m.talkId))
+    .filter(m=>!m.deleted&&(m.type==='group'||m.type==='class')&&matchingTalkIds.includes(m.talkId))
     .sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))
     .slice(-200)
     .map(m=>messagePublic(db,m));
@@ -462,7 +462,7 @@ app.post('/api/talks/:room/messages',auth,async(req,res)=>{
       return msg;
     });
     const payload=messagePublic(load(),m);
-    wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'group_message',message:payload,talkId:m.talkId}))});
+    wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:room==='class'?'class_message':'group_message',message:payload,talkId:m.talkId}))});
     res.json(payload);
   }catch(e){res.status(e.status||400).json({error:e.message||'メッセージを送信できません'});}
 });
@@ -476,7 +476,7 @@ app.get('/api/class',auth,(req,res)=>{
     db.classTalks.push(talk);
   }
   if(!talk.memberIds.includes(req.user.id)){talk.memberIds.push(req.user.id);save(db);}
-  const messages=(db.messages||[]).filter(m=>m.type==='class'&&m.talkId===talk.id).slice(-200).map(m=>messagePublic(db,m));
+  const messages=(db.messages||[]).filter(m=>!m.deleted&&(m.type==='class'||m.type==='group')&&m.talkId===talk.id).slice(-200).map(m=>messagePublic(db,m));
   const members=db.users.filter(u=>talk.memberIds.includes(u.id)).map(pub);
   res.json({talk,messages,members});
 });
