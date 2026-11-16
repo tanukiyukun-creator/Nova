@@ -36,7 +36,7 @@ function clearNovaAccountState(){
 }
 function logout(){clearNovaAccountState();me=null;friends=[];chatRoom='class';chatTarget=null;currentChat=null;view='home';render()}
 async function render(skipAuthRefresh=false){
-  if(me)startGlobalChatInbox();if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&hasClientRole('SUPER_ADMIN'))return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他'],...(hasClientRole('SUPER_ADMIN')?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',settings:'その他'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':profileFallbackHtml()}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
+  if(me){startGlobalChatInbox();startGlobalFriendRequests();}if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&hasClientRole('SUPER_ADMIN'))return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他'],...(hasClientRole('SUPER_ADMIN')?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',settings:'その他'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':profileFallbackHtml()}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
 async function renderSuperAdmin(){
   let state={users:[],schools:[],messages:[],friends:[],posts:[],events:[],tasks:[],schedules:[],elections:[],notifications:[],calls:[]};
   try{state=await api('/api/debug/state')}catch(x){document.body.innerHTML=`<div class="auth premium-auth"><div class="authbox glass"><div class="auth-logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div>NOVA<small>SYSTEM ADMIN</small></div></div><div class="auth-hero"><small>SUPER ADMIN</small><h1>管理画面を開けませんでした</h1><p>${esc(x.message||'認証セッションを確認してください')}</p><button class="btn alt" onclick="logout()">通常ログインへ</button></div></div></div>`;return}
@@ -431,7 +431,7 @@ async function refreshOpenChat(){
     if(added)scrollChatToBottom();
   }catch(e){console.warn('NOVA_CHAT_POLL_ERROR',e)}
 }
-async function pollFriendRequests(){
+async async function pollFriendRequests(){
   try{
     const data=await api('/api/friend-requests');
     const incoming=Array.isArray(data?.incoming)?data.incoming:[];
@@ -442,7 +442,12 @@ async function pollFriendRequests(){
       if(view==='chat')chat($('#main'));
     }
     lastIncomingFriendRequestIds=ids;
-  }catch{}
+  }catch(e){}
+}
+function startGlobalFriendRequests(){
+  if(window.novaGlobalFriendRequestTimer)clearInterval(window.novaGlobalFriendRequestTimer);
+  pollFriendRequests();
+  window.novaGlobalFriendRequestTimer=setInterval(()=>pollFriendRequests(),3000);
 }
 let novaGlobalInboxTimer=null;
 function startGlobalChatInbox(){
