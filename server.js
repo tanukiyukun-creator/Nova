@@ -234,6 +234,20 @@ app.get('/api/friends',auth,(req,res)=>{const db=load();const ids=db.friends.fil
 app.get('/api/friend-requests',auth,(req,res)=>{const db=load();const incoming=(db.friendRequests||[]).filter(x=>x.to===req.user.id).map(x=>({...x,user:pub(db.users.find(u=>u.id===x.from))}));const outgoing=(db.friendRequests||[]).filter(x=>x.from===req.user.id).map(x=>({...x,user:pub(db.users.find(u=>u.id===x.to))}));res.json({incoming,outgoing})});
 app.post('/api/friend-requests/:id/accept',auth,(req,res)=>{const db=load();const x=(db.friendRequests||[]).find(x=>x.id===req.params.id&&x.to===req.user.id);if(!x)return res.status(404).json({error:'申請が見つかりません'});if(!db.friends.some(f=>(f.a===x.from&&f.b===x.to)||(f.a===x.to&&f.b===x.from)))db.friends.push({a:x.from,b:x.to,createdAt:Date.now()});db.friendRequests=db.friendRequests.filter(y=>y.id!==x.id);save(db);res.json({ok:true})});
 app.post('/api/friend-requests/:id/reject',auth,(req,res)=>{const db=load();const x=(db.friendRequests||[]).find(x=>x.id===req.params.id&&x.to===req.user.id);if(!x)return res.status(404).json({error:'申請が見つかりません'});db.friendRequests=db.friendRequests.filter(y=>y.id!==x.id);save(db);res.json({ok:true})});
+app.get('/api/chats/inbox',auth,(req,res)=>{try{
+  const db=load(),meId=String(req.user.id);
+  const rows=[...(db.messages||[]),...migrateDirectMessages()];
+  const unique=new Map();
+  for(const m of rows){
+    if(!m||m.deleted||m.type!=='direct'||String(m.to)!==meId)continue;
+    unique.set(String(m.id),m);
+  }
+  const list=[...unique.values()]
+    .sort((a,b)=>(Number(a.createdAt)||0)-(Number(b.createdAt)||0))
+    .slice(-200)
+    .map(m=>messagePublic(db,m));
+  res.json({messages:list});
+}catch(e){res.status(500).json({error:'受信メッセージを取得できません'});}});
 app.get('/api/chats/:otherId',auth,(req,res)=>{try{
   const db=load(),meId=String(req.user.id),otherId=String(req.params.otherId);
   if(!db.users.some(u=>String(u.id)===otherId))return res.status(404).json({error:'相手が見つかりません'});
