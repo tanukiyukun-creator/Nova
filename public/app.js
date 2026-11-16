@@ -337,7 +337,8 @@ function homeNotificationItems(notes){
   return notes.filter(n=>!n.read);
 }
 async function home(m){
-  const [tasks,notes,schedule,changes]=await Promise.all([api('/api/tasks').catch(()=>[]),api('/api/notifications').catch(()=>[]),api('/api/schedule').catch(()=>[]),api('/api/schedule/changes').catch(()=>[])]);
+  const [tasks,notes,schedule,changes,friendRequests]=await Promise.all([api('/api/tasks').catch(()=>[]),api('/api/notifications').catch(()=>[]),api('/api/schedule').catch(()=>[]),api('/api/schedule/changes').catch(()=>[]),api('/api/friend-requests').catch(()=>({incoming:[],outgoing:[]}))]);
+  const incomingFriendRequests=Array.isArray(friendRequests?.incoming)?friendRequests.incoming:[];
   const now=new Date();
   const selected=new Date(homeSelectedDate);
   const isToday=selected.toDateString()===now.toDateString();
@@ -386,6 +387,10 @@ async function home(m){
         <div class="home-list">${chatHtml}</div>
       </section>
     </div>
+    <section class="home-card glass home-friend-request-card">
+      <div class="compact-card-head"><div><span class="card-icon">♙</span><div><b>フレンド申請</b><small>${incomingFriendRequests.length}件</small></div></div><button class="mini-link" onclick="go('chat')">トークで確認 ›</button></div>
+      <div class="home-friend-request-list">${incomingFriendRequests.map(x=>'<div class="home-friend-request-row"><div class="home-friend-request-user">'+avatarHtml(x.user)+'<div><b>'+esc(x.user?.displayName||'メンバー')+'</b><small>フレンド申請が届いています</small></div></div><div class="home-friend-request-actions"><button onclick="acceptFriendRequest(\''+esc(x.id)+'\');event.stopPropagation()">承認</button><button class="reject" onclick="rejectFriendRequest(\''+esc(x.id)+'\');event.stopPropagation()">拒否</button></div></div>').join('')||'<div class="home-empty">新しいフレンド申請はありません</div>'}</div>
+    </section>
     <section class="home-card glass home-notice-card">
       <div class="compact-card-head"><div><span class="card-icon">♧</span><div><b>お知らせ</b><small>${notices.length}件の未読</small></div></div><button class="mini-link" onclick="api('/api/notifications/read',{method:'POST'}).then(()=>home($('#main'))).catch(x=>toast(x.message))">すべて既読</button></div>
       <div class="home-notice-list">${noticeHtml}</div>
