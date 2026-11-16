@@ -539,6 +539,12 @@ function closeTalkMembers(){document.getElementById('novaMembersModal')?.remove(
 async function openFriendAdd(){
   const html='<div class="nova-members-modal" id="friendAddModal"><div class="nova-members-bg" onclick="closeFriendAdd()"></div><div class="nova-members-card"><div class="nova-members-head"><div><div class="eyebrow">NOVA / FRIENDS</div><h3>友達を追加</h3><small>名前・学校名・学年・クラスで検索</small></div><button type="button" class="nova-members-close" onclick="closeFriendAdd()">×</button></div><div class="friend-add-search"><input id="friendSearchInput" class="input" placeholder="名前や学校名を入力" autocomplete="off" oninput="searchFriendCandidates()"></div><div id="friendCandidates" class="nova-members-list"><div class="line-empty">検索すると候補が表示されます</div></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',html);
+  const modal=document.getElementById('friendAddModal');
+  modal?.addEventListener('click',e=>{
+    const btn=e.target.closest('.friend-add-btn[data-user-id]');
+    if(!btn||btn.disabled)return;
+    addFriendFromSearch(btn.dataset.userId);
+  });
   $('#friendSearchInput')?.focus();
 }
 function closeFriendAdd(){document.getElementById('friendAddModal')?.remove()}
@@ -557,8 +563,8 @@ async function searchFriendCandidates(){
     $('#friendCandidates').innerHTML=list.map(u=>{
       const pending=outgoingSet.has(String(u.id));
       const button=pending
-        ? '<button class="friend-add-btn friend-add-sent" disabled>送信済み</button>'
-        : '<button class="friend-add-btn" data-user-id="'+esc(String(u.id))+'" onclick="addFriendFromSearch('+JSON.stringify(u.id)+')">追加</button>';
+        ? '<button type="button" class="friend-add-btn friend-add-sent" disabled>送信済み</button>'
+        : '<button type="button" class="friend-add-btn" data-user-id="'+esc(String(u.id))+'">追加</button>';
       return '<div class="nova-member-row friend-candidate">'+avatarHtml(u)+'<div><b>'+esc(u.displayName||'メンバー')+'</b><small>'+esc((u.schoolName||'')+(u.grade?' · '+u.grade+'年':'')+(u.className?' '+u.className+'組':''))+'</small></div>'+button+'</div>';
     }).join('')||'<div class="line-empty">追加できるユーザーが見つかりません</div>';
   }catch(e){toast(e.message||'ユーザーを検索できません')}
