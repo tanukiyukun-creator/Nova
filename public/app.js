@@ -12,7 +12,7 @@ function persistUser(u){
 }
 const novaIconHtml=()=>'<img class="nova-brand-icon" src="/icon.svg?v=5" alt="">';
 const profileFallbackHtml=()=>'<span class="profile-fallback" aria-hidden="true">●</span>';
-const avatarHtml=(u,size='')=>{const icon=String(u?.icon||'').trim();return icon?'<img class="chat-avatar '+size+'" src="'+esc(icon)+'" alt="">':'<span class="chat-avatar-fallback '+size+'" aria-hidden="true">👤</span>'};
+const avatarHtml=(u,size='')=>{const icon=String(u?.icon||'').trim();const name=String(u?.displayName||u?.lastName||u?.firstName||'メンバー').trim();const initial=esc((name.replace(/\\s+/g,'').slice(0,1)||'👤'));if(!icon)return '<span class="chat-avatar-fallback '+size+'" aria-hidden="true">'+initial+'</span>';return '<img class="chat-avatar '+size+'" src="'+esc(icon)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement(\'span\'),{className:\'chat-avatar-fallback '+size+'\',textContent:'+JSON.stringify(initial)+'}))">'};
 const bookIconHtml=()=>'<span class="book-fallback" aria-hidden="true">▤</span>';
 const schoolIconHtml=()=>'<span class="school-fallback" aria-hidden="true">⌂</span>';
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
