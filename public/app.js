@@ -431,7 +431,7 @@ async function refreshOpenChat(){
     if(added)scrollChatToBottom();
   }catch(e){console.warn('NOVA_CHAT_POLL_ERROR',e)}
 }
-async async function pollFriendRequests(){
+async function pollFriendRequests(){
   try{
     const data=await api('/api/friend-requests');
     const incoming=Array.isArray(data?.incoming)?data.incoming:[];
