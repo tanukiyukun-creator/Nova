@@ -905,12 +905,22 @@ function mergeChatMessages(room,serverMessages,fallbackMessage=null){
 async function chatHtml(id2,fallbackMessage=null){
   const cacheRoom=directChatCacheRoom(id2);
   migrateLegacyDirectChatCache(id2);
-  let data=null;
-  try{data=await api('/api/chats/'+encodeURIComponent(id2));}
-  catch(e){console.warn('NOVA_DIRECT_HISTORY_ERROR',e)}
-  const ms=Array.isArray(data)?data:(Array.isArray(data?.messages)?data.messages:[]);
-  // サーバーから一時的に欠けたメッセージがあっても、端末に保存済みの履歴を消さない。
-  const messages=mergeChatMessages(cacheRoom,ms,fallbackMessage);
+  let messages=[];
+  let serverOk=false;
+  try{
+    const data=await api('/api/chats/'+encodeURIComponent(id2));
+    messages=Array.isArray(data)?data:(Array.isArray(data?.messages)?data.messages:[]);
+    serverOk=true;
+  }catch(e){console.warn('NOVA_DIRECT_HISTORY_ERROR',e)}
+  if(serverOk){
+    // 個人トークの履歴はサーバーを唯一の正本にする。
+    if(fallbackMessage?.id&&!messages.some(x=>String(x?.id)===String(fallbackMessage.id)))messages.push(fallbackMessage);
+    messages.sort((a,b)=>(Number(a?.createdAt)||0)-(Number(b?.createdAt)||0));
+    writeChatCache(cacheRoom,messages);
+  }else{
+    // サーバーが一時的に取得できない時だけ端末キャッシュを利用する。
+    messages=mergeChatMessages(cacheRoom,[],fallbackMessage);
+  }
   try{await api('/api/chats/'+encodeURIComponent(id2)+'/read',{method:'POST'})}catch{}
   return messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
 }
