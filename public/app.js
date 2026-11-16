@@ -659,7 +659,7 @@ async function groupChatHtml(room,fallbackMessage=null){
       const active=elections.filter(e=>e.status==='OPEN'&&e.endsAt>Date.now());
       if(active.length){
         const panel=active.map(e=>{
-          const title=e.type==='CLASS_ADMIN'?'CLASS ADMIN選挙':'GRADE ADMIN選挙';
+          const title=e.type==='CLASS_ADMIN'?'CLASS ADMIN選挙':e.type==='GRADE_ADMIN'?'GRADE ADMIN選挙':'SCHOOL ADMIN選挙';
           const buttons=(e.candidates||[]).map(c=>{
             const disabled=e.voted?'disabled':'';
             const label=esc(c.name)+(e.voted?'':'に投票');
