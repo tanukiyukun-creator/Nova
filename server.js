@@ -649,7 +649,7 @@ wss.on('connection',(ws,req)=>{
       }
     }catch{}
   });
-  ws.on('close',()=>{if(wsUsers.get(u.id)===ws)wsUsers.delete(u.id)});
+  ws.on('close',()=>{if(wsUsers.get(String(u.id))===ws)wsUsers.delete(String(u.id))});
 });
 app.use((req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 server.listen(process.env.PORT||3000,()=>console.log('Nova running on http://localhost:'+(process.env.PORT||3000)));
