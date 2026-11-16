@@ -657,14 +657,14 @@ async function openElectionModal(){
       if(e.status!=='OPEN'||e.endsAt<=Date.now())return false;
       if(chatRoom==='class')return e.type==='CLASS_ADMIN';
       if(chatRoom==='classadmin')return e.type==='GRADE_ADMIN';
-      if(chatRoom==='gradeadmin')return e.type==='SCHOOL_ADMIN'||e.type==='GRADE_ADMIN';
+      if(chatRoom==='gradeadmin')return e.type==='SCHOOL_ADMIN';
       return false;
     });
     if(!scoped.length){toast('現在投票できる選挙はありません');return}
     const modal=document.createElement('div'); modal.className='nova-election-modal'; modal.id='novaElectionModal';
     const cards=scoped.map(e=>{
       const title=e.type==='CLASS_ADMIN'?'CLASS ADMIN選挙':e.type==='GRADE_ADMIN'?'GRADE ADMIN選挙':'SCHOOL ADMIN選挙';
-      const meId=window.NOVA_ME?.id||window.NOVA_USER?.id||state?.me?.id;
+      const meId=me?.id;
       const candidate=(e.candidates||[]).find(c=>String(c.userId)===String(meId));
       const canVote=!!e.eligible&&!e.voted;
       const rows=(e.candidates||[]).slice().sort((x,y)=>(y.votes||0)-(x.votes||0)).map(c=>{
