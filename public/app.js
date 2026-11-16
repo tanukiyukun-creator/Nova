@@ -504,7 +504,7 @@ function scrollChatToBottom(){
   requestAnimationFrame(()=>{move();requestAnimationFrame(move)});
   box.querySelectorAll('img').forEach(img=>img.addEventListener('load',move,{once:true}));
 }
-  m.innerHTML='<div class="line-chat"><aside class="line-chat-list glass '+(mobileChatOpen?'mobile-hide':'')+'"><div class="line-list-head"><div><div class="eyebrow">NOVA</div><h2>トーク</h2></div><div class="line-head-actions"><button class="line-new friend-add-top" title="友達を追加" onclick="openFriendAdd()">友達追加</button><button class="line-new" title="グループ作成" onclick="createGroup()">＋</button></div></div><div class="line-search"><input class="input" placeholder="トーク・友達を検索" oninput="filterChatList(this.value)"></div><div id="lineRoomList"><div class="line-label">学校</div>'+rooms.map(roomButton).join('')+'<div class="line-label">グループ</div>'+(groups.map(groupButton).join('')||'<div class="line-empty">グループはありません</div>')+'<div class="line-label">友達</div>'+(friends.map(friendButton).join('')||'<div class="line-empty">友達を追加するとここに表示されます</div>')+'<div class="line-label">フレンド申請'+(friendRequests.incoming.length?'<span class="line-request-count">'+friendRequests.incoming.length+'</span>':'')+'</div>'+(friendRequests.incoming.map(requestButton).join('')||'<div class="line-empty">フレンド申請はありません</div>')+'</div></aside><section class="line-chat-main glass '+(mobileChatOpen?'mobile-show':'')+'"><header class="line-header"><button class="line-back" onclick="closeMobileChat()">‹</button><div class="line-header-avatar">'+(selectedFriend?avatarHtml(selectedFriend):'<span class="line-avatar">'+(selectedGroup?'G':room?.icon||'C')+'</span>')+'</div><div class="line-header-name"><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div>'+'<div class="line-call">'+((room||selectedGroup)?'<button class="line-call-btn" title="所属メンバー" onclick="showTalkMembers()">👥</button>':'')+((chatRoom==='classadmin'||chatRoom==='gradeadmin')?'<button class="line-call-btn" title="管理者選出" onclick="startElectionPrompt(\''+chatRoom+'\')">投票</button>':'')+((selectedFriend||selectedGroup||room)?'<button class="line-call-btn" title="音声通話" onclick="startCall(\'audio\')">☎</button><button class="line-call-btn video" title="ビデオ通話" onclick="startCall(\'video\')">▣</button>':'')+'</div>'+'</header><div id="chatbox" class="line-messages">'+boxHtml+'</div>'+(canCompose?'<form class="line-compose" onsubmit="sendCurrentChat(event)"><label class="line-attach">＋<input type="file" accept="image/*" hidden onchange="sendImageFile(event)"></label><input id="chatText" class="line-input" name="text" placeholder="メッセージ" autocomplete="off"><button class="line-send" type="submit">➤</button></form>':'<div class="line-readonly">このトークにはメッセージを送信できません。</div>')+'</section></div>';
+  m.innerHTML='<div class="line-chat"><aside class="line-chat-list glass '+(mobileChatOpen?'mobile-hide':'')+'"><div class="line-list-head"><div><div class="eyebrow">NOVA</div><h2>トーク</h2></div><div class="line-head-actions"><button class="line-new friend-add-top" title="友達を追加" onclick="openFriendAdd()">友達追加</button><button class="line-new" title="グループ作成" onclick="createGroup()">＋</button></div></div><div class="line-search"><input class="input" placeholder="トーク・友達を検索" oninput="filterChatList(this.value)"></div><div id="lineRoomList"><div class="line-label">学校</div>'+rooms.map(roomButton).join('')+'<div class="line-label">グループ</div>'+(groups.map(groupButton).join('')||'<div class="line-empty">グループはありません</div>')+'<div class="line-label">友達</div>'+(friends.map(friendButton).join('')||'<div class="line-empty">友達を追加するとここに表示されます</div>')+'<div class="line-label">フレンド申請'+(friendRequests.incoming.length?'<span class="line-request-count">'+friendRequests.incoming.length+'</span>':'')+'</div>'+(friendRequests.incoming.map(requestButton).join('')||'<div class="line-empty">フレンド申請はありません</div>')+'</div></aside><section class="line-chat-main glass '+(mobileChatOpen?'mobile-show':'')+'"><header class="line-header"><button class="line-back" onclick="closeMobileChat()">‹</button><div class="line-header-avatar">'+(selectedFriend?avatarHtml(selectedFriend):'<span class="line-avatar">'+(selectedGroup?'G':room?.icon||'C')+'</span>')+'</div><div class="line-header-name"><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div>'+'<div class="line-call">'+((room||selectedGroup)?'<button class="line-call-btn" title="所属メンバー" onclick="showTalkMembers()">👥</button>':'')+((chatRoom==='class'||chatRoom==='classadmin'||chatRoom==='gradeadmin')?'<button class="line-vote-btn" title="管理者選出" onclick="openElectionModal()">投票</button>':'')+((selectedFriend||selectedGroup||room)?'<button class="line-call-btn" title="音声通話" onclick="startCall(\'audio\')">☎</button><button class="line-call-btn video" title="ビデオ通話" onclick="startCall(\'video\')">▣</button>':'')+'</div>'+'</header><div id="chatbox" class="line-messages">'+boxHtml+'</div>'+(canCompose?'<form class="line-compose" onsubmit="sendCurrentChat(event)"><label class="line-attach">＋<input type="file" accept="image/*" hidden onchange="sendImageFile(event)"></label><input id="chatText" class="line-input" name="text" placeholder="メッセージ" autocomplete="off"><button class="line-send" type="submit">➤</button></form>':'<div class="line-readonly">このトークにはメッセージを送信できません。</div>')+'</section></div>';
   scrollChatToBottom();
 }
 async function showTalkMembers(){
@@ -643,37 +643,46 @@ async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(t
 async function closeMobileChat(){chatTarget=null;chatRoom='';await render(true)}
 async function groupChatHtml(room,fallbackMessage=null){
   let data;
-  if(room==='class'){
-    data=await api('/api/talks/class');
-  }else if(room.startsWith('group:')){
-    data=await api('/api/groups/'+encodeURIComponent(room.slice(6)));
-  }else{
-    data=await api('/api/talks/'+encodeURIComponent(room));
-  }
+  if(room==='class')data=await api('/api/talks/class');
+  else if(room.startsWith('group:'))data=await api('/api/groups/'+encodeURIComponent(room.slice(6)));
+  else data=await api('/api/talks/'+encodeURIComponent(room));
   const messages=mergeChatMessages(room,data?.messages,fallbackMessage);
   try{if(room==='friend'&&chatTarget)await api('/api/chats/'+encodeURIComponent(chatTarget)+'/read',{method:'POST'});else if(room==='class'||room==='classadmin'||room==='gradeadmin')await api('/api/talks/'+encodeURIComponent(room)+'/read',{method:'POST'});else if(room.startsWith('group:'))await api('/api/groups/'+encodeURIComponent(room.slice(6))+'/read',{method:'POST'})}catch{}
-  let html=messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
-  if(room==='class'||room==='classadmin'||room==='gradeadmin'){
-    try{
-      const elections=await api('/api/elections');
-      const active=elections.filter(e=>e.status==='OPEN'&&e.endsAt>Date.now());
-      if(active.length){
-        const panel=active.map(e=>{
-          const title=e.type==='CLASS_ADMIN'?'CLASS ADMIN選挙':e.type==='GRADE_ADMIN'?'GRADE ADMIN選挙':'SCHOOL ADMIN選挙';
-          const buttons=(e.candidates||[]).map(c=>{
-            const disabled=e.voted?'disabled':'';
-            const label=esc(c.name)+(e.voted?'':'に投票');
-            return '<button '+disabled+' onclick="voteElection('+JSON.stringify(e.id)+','+JSON.stringify(c.id)+')">'+label+'</button>';
-          }).join('');
-          return '<div class="election-card"><small>'+title+'</small><b>管理者を選出</b><div class="election-options">'+buttons+'</div><span>'+(e.voted?'投票済み':'投票受付中')+'</span></div>';
-        }).join('');
-        html='<div class="election-panel glass">'+panel+'</div>'+html;
-      }
-    }catch{}
-  }
-  return html;
+  return messages.map(x=>messageBubble(x)).join('')||'<div class="chat-empty-state"><span>○</span><b>まだメッセージはありません</b><small>最初のメッセージを送ってみましょう。</small></div>';
 }
-async function voteElection(electionId,candidateId){try{await api('/api/elections/'+electionId+'/vote',{method:'POST',body:JSON.stringify({candidateId})});toast('投票しました');await render(true)}catch(e){toast(e.message)}}
+async function openElectionModal(){
+  try{
+    const elections=await api('/api/elections');
+    const scoped=elections.filter(e=>{
+      if(e.status!=='OPEN'||e.endsAt<=Date.now())return false;
+      if(chatRoom==='class')return e.type==='CLASS_ADMIN';
+      if(chatRoom==='classadmin')return e.type==='GRADE_ADMIN';
+      if(chatRoom==='gradeadmin')return e.type==='SCHOOL_ADMIN'||e.type==='GRADE_ADMIN';
+      return false;
+    });
+    if(!scoped.length){toast('現在投票できる選挙はありません');return}
+    const modal=document.createElement('div'); modal.className='nova-election-modal'; modal.id='novaElectionModal';
+    const cards=scoped.map(e=>{
+      const title=e.type==='CLASS_ADMIN'?'CLASS ADMIN選挙':e.type==='GRADE_ADMIN'?'GRADE ADMIN選挙':'SCHOOL ADMIN選挙';
+      const meId=window.NOVA_ME?.id||window.NOVA_USER?.id||state?.me?.id;
+      const candidate=(e.candidates||[]).find(c=>String(c.userId)===String(meId));
+      const canVote=!!e.eligible&&!e.voted;
+      const rows=(e.candidates||[]).slice().sort((x,y)=>(y.votes||0)-(x.votes||0)).map(c=>{
+        const self=String(c.userId)===String(meId);
+        const button=canVote&&!self?'<button class="nova-election-vote" onclick="voteElectionFromModal('+JSON.stringify(e.id)+','+JSON.stringify(c.id)+')">投票</button>':(self?'<span class="nova-election-self">自分</span>':'');
+        return '<div class="nova-election-candidate"><div><b>'+esc(c.name)+'</b><small>'+Number(c.votes||0)+'票</small></div>'+button+'</div>';
+      }).join('');
+      const nominate=e.eligible&&!candidate?'<button class="nova-election-nominate" onclick="nominateElection('+JSON.stringify(e.id)+')">自分が立候補する</button>':candidate?'<div class="nova-election-nominated">立候補済み</div>':'';
+      const remain=Math.max(0,e.endsAt-Date.now()),days=Math.floor(remain/86400000),hours=Math.floor(remain%86400000/3600000),mins=Math.floor(remain%3600000/60000);
+      return '<section class="nova-election-card"><div class="nova-election-card-head"><div><small>'+title+'</small><h3>管理者を選出</h3></div><span>残り '+days+'日 '+hours+'時間 '+mins+'分</span></div><div class="nova-election-list">'+rows+'</div>'+nominate+'<div class="nova-election-status">'+(e.voted?'投票済み':e.eligible?'投票できます':'投票資格がありません')+'</div></section>';
+    }).join('');
+    modal.innerHTML='<div class="nova-election-bg" onclick="closeElectionModal()"></div><div class="nova-election-dialog"><div class="nova-election-head"><div><small>NOVA / ELECTION</small><h2>管理者選出</h2><p>候補者ごとの得票数を確認して投票できます。</p></div><button onclick="closeElectionModal()">×</button></div>'+cards+'</div>';
+    document.body.appendChild(modal);
+  }catch(e){toast(e.message)}
+}
+function closeElectionModal(){document.getElementById('novaElectionModal')?.remove()}
+async function voteElectionFromModal(electionId,candidateId){try{await api('/api/elections/'+electionId+'/vote',{method:'POST',body:JSON.stringify({candidateId})});toast('投票しました');closeElectionModal();await render(true);setTimeout(openElectionModal,50)}catch(e){toast(e.message)}}
+async function nominateElection(electionId){try{await api('/api/elections/'+electionId+'/candidate',{method:'POST',body:'{}'});toast('立候補しました');closeElectionModal();await render(true);setTimeout(openElectionModal,50)}catch(e){toast(e.message)}}
 async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
 async function openNotificationChat(n){
   try{
