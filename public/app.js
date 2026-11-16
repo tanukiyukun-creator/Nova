@@ -50,7 +50,6 @@ async function renderSuperAdmin(){
         <div class="super-brand"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div><strong>NOVA</strong><small>SYSTEM ADMIN</small></div></div>
         <div class="super-account"><div class="super-avatar"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""></div><div><b>SUPER ADMIN</b><small>Nova System</small></div></div>
         <nav>
-          <button class="super-nav active" onclick="superSection('overview',this)">◈ <span>概要</span></button>
           <button class="super-nav" onclick="superSection('users',this)">♙ <span>ユーザー管理</span></button>
           <button class="super-nav" onclick="superSection('permissions',this)">♜ <span>権限管理</span></button>
           <button class="super-nav" onclick="superSection('elections',this)">◇ <span>管理者選出</span></button>
@@ -70,7 +69,7 @@ async function renderSuperAdmin(){
       </main>
     </div>`;
   window.NOVA_SUPER_STATE=state;
-  superSection('overview');
+  superSection('users');
 }
 function hasRoleForAdminUI(u,role){return u?.role===role||Array.isArray(u?.adminRoles)&&u.adminRoles.includes(role)}
 async function superBan(id){
@@ -96,42 +95,20 @@ function superSection(section,btn){
   if(btn)btn.classList.add('active');
   const state=window.NOVA_SUPER_STATE||{};
   const users=state.users||[],schools=state.schools||[];
-  const titles={overview:'管理者ダッシュボード',users:'ユーザー管理',permissions:'権限管理',elections:'管理者選出',schools:'学校管理',content:'コンテンツ管理',safety:'通報・安全管理',system:'システム'};
-  const title=$('#superTitle');if(title)title.textContent=titles[section]||titles.overview;
+  const titles={users:'ユーザー管理',permissions:'権限管理',elections:'管理者選出',schools:'学校管理',content:'コンテンツ管理',safety:'通報・安全管理',system:'システム'};
+  const title=$('#superTitle');if(title)title.textContent=titles[section]||titles.users;
   const c=$('#superContent');if(!c)return;
-  if(section==='overview'){
-    c.innerHTML=`
-      <div class="super-welcome glass"><div><span class="super-kicker">NOVA SYSTEM</span><h2>Nova全体を管理します。</h2><p>学校・ユーザー・管理者・サービスデータを一元管理するSUPER ADMIN専用画面です。</p></div><div class="system-badge"><i></i> SYSTEM ONLINE</div></div>
-      <div class="super-stats">
-        <div class="super-stat glass"><small>USERS</small><strong>${users.length}</strong><span>登録ユーザー</span></div>
-        <div class="super-stat glass"><small>SCHOOLS</small><strong>${schools.length}</strong><span>登録学校</span></div>
-        <div class="super-stat glass"><small>ADMINS</small><strong>${users.filter(u=>(u.role&&u.role!=='STUDENT')||(Array.isArray(u.adminRoles)&&u.adminRoles.length)).length}</strong><span>管理者</span></div>
-        <div class="super-stat glass"><small>MESSAGES</small><strong>${(state.messages||[]).length}</strong><span>メッセージ</span></div>
-      </div>
-      <div class="super-grid">
-        <section class="glass super-card span2"><div class="super-card-head"><div><small>ADMIN HIERARCHY</small><h3>管理者構成</h3></div></div>
-          <div class="role-row"><b>SUPER ADMIN</b><span>${roleCount('SUPER_ADMIN')}</span></div>
-          <div class="role-row"><b>SCHOOL ADMIN</b><span>${roleCount('SCHOOL_ADMIN')}</span></div>
-          <div class="role-row"><b>GRADE ADMIN</b><span>${roleCount('GRADE_ADMIN')}</span></div>
-          <div class="role-row"><b>CLASS ADMIN</b><span>${roleCount('CLASS_ADMIN')}</span></div>
-        </section>
-        <section class="glass super-card span2"><div class="super-card-head"><div><small>RECENT REGISTRATIONS</small><h3>最近の登録</h3></div><button class="super-link" onclick="superSection('users')">すべて見る →</button></div>
-          ${recent.map(u=>`<div class="super-user-row"><div class="super-mini-avatar">${u.icon?'<img src="'+esc(u.icon)+'">':profileFallbackHtml()}</div><div><b>${esc(u.displayName)}</b><small>${esc(u.schoolName)} · ${esc(u.grade)}年 ${esc(u.className)}組</small></div><em>${esc(u.role)}</em></div>`).join('')||'<div class="super-empty">登録ユーザーはありません</div>'}
-        </section>
-        <section class="glass super-card span4"><div class="super-card-head"><div><small>SERVICE DATA</small><h3>サービス状況</h3></div></div>
-          <div class="data-grid">
-            <div><b>${(state.posts||[]).length}</b><span>掲示板投稿</span></div>
-            <div><b>${(state.events||[]).length}</b><span>行事</span></div>
-            <div><b>${(state.tasks||[]).length}</b><span>課題</span></div>
-            <div><b>${(state.elections||[]).length}</b><span>選挙</span></div>
-            <div><b>${(state.friends||[]).length}</b><span>友達関係</span></div>
-            <div><b>${(state.notifications||[]).length}</b><span>通知</span></div>
-          </div>
-        </section>
-      </div>`;
-  }else if(section==='users'){
-    c.innerHTML=`<section class="glass super-card"><div class="super-card-head"><div><small>USER DIRECTORY</small><h3>全ユーザー</h3></div><span class="super-count" id="superUserCount">${users.length} USERS</span></div><div class="super-user-tools"><input id="superUserSearch" class="input" placeholder="名前・学校名・学年・クラス・出席番号で検索" autocomplete="off"><select id="superUserStatus" class="input"><option value="all">すべて</option><option value="active">ACTIVE</option><option value="banned">BAN</option></select></div><div class="super-table-wrap"><table class="super-table"><thead><tr><th>ユーザー</th><th>学校</th><th>所属</th><th>権限</th><th>状態</th><th>操作</th></tr></thead><tbody id="superUserRows">${users.map(u=>`<tr data-user-search="${esc([u.displayName,u.schoolName,u.grade,u.className,u.attendanceNo,u.role,...(Array.isArray(u.adminRoles)?u.adminRoles:[])].join(' ')).toLowerCase()}" data-user-status="${u.banned?'banned':'active'}"><td><div class="table-user"><div class="super-mini-avatar">${u.icon?'<img src="'+esc(u.icon)+'">':profileFallbackHtml()}</div><b>${esc(u.displayName)}</b></div></td><td>${esc(u.schoolName)}</td><td>${esc(u.grade)}年 ${esc(u.className)}組 / ${esc(u.attendanceNo)}</td><td><span class="role-pill ${esc(String(u.role||'STUDENT').toLowerCase())}">${esc([u.role||'STUDENT',...(Array.isArray(u.adminRoles)?u.adminRoles:[])].filter((v,i,a)=>a.indexOf(v)===i).join(' / '))}</span></td><td><span class="status-pill ${u.banned?'banned':'active'}">${u.banned?'BAN':'ACTIVE'}</span></td><td><button class="ban-btn" onclick="superRolePrompt(${JSON.stringify(u.id)})">権限変更</button> ${hasRoleForAdminUI(u,'SUPER_ADMIN')?'<span class="protected-label">保護</span>':u.banned?`<button class="ban-btn unban" onclick="superUnban(${JSON.stringify(u.id)})">BAN解除</button>`:`<button class="ban-btn" onclick="superBan(${JSON.stringify(u.id)})">アカウントBAN</button>`}</td></tr>`).join('')}</tbody></table></div></section>`;
+  if(section==='users'){
+    c.innerHTML=`<section class="glass super-card"><div class="super-card-head"><div><small>USER DIRECTORY</small><h3>全ユーザー</h3></div><span class="super-count" id="superUserCount">${users.length} USERS</span></div><div class="super-user-tools"><input id="superUserSearch" class="input" placeholder="名前・学校名・学年・クラス・出席番号で検索" autocomplete="off"><select id="superUserStatus" class="input"><option value="all">すべて</option><option value="active">ACTIVE</option><option value="banned">BAN</option></select></div><div class="super-table-wrap"><table class="super-table"><thead><tr><th>ユーザー</th><th>学校</th><th>所属</th><th>権限</th><th>状態</th><th>操作</th></tr></thead><tbody id="superUserRows">${users.map(u=>`<tr data-user-search="${esc([u.displayName,u.schoolName,u.grade,u.className,u.attendanceNo,u.role,...(Array.isArray(u.adminRoles)?u.adminRoles:[])].join(' ')).toLowerCase()}" data-user-status="${u.banned?'banned':'active'}"><td><div class="table-user"><div class="super-mini-avatar">${u.icon?'<img src="'+esc(u.icon)+'">':profileFallbackHtml()}</div><b>${esc(u.displayName)}</b></div></td><td>${esc(u.schoolName)}</td><td>${esc(u.grade)}年 ${esc(u.className)}組 / ${esc(u.attendanceNo)}</td><td><span class="role-pill ${esc(String(u.role||'STUDENT').toLowerCase())}">${esc([u.role||'STUDENT',...(Array.isArray(u.adminRoles)?u.adminRoles:[])].filter((v,i,a)=>a.indexOf(v)===i).join(' / '))}</span></td><td><span class="status-pill ${u.banned?'banned':'active'}">${u.banned?'BAN':'ACTIVE'}</span></td><td><button type="button" class="ban-btn" data-super-action="role" data-user-id="${esc(String(u.id))}">権限変更</button> ${hasRoleForAdminUI(u,'SUPER_ADMIN')?'<span class="protected-label">保護</span>':u.banned?`<button type="button" class="ban-btn unban" data-super-action="unban" data-user-id="${esc(String(u.id))}">BAN解除</button>`:`<button type="button" class="ban-btn" data-super-action="ban" data-user-id="${esc(String(u.id))}">アカウントBAN</button>`}</td></tr>`).join('')}</tbody></table></div></section>`;
     const applyUserFilter=()=>{const q=String($('#superUserSearch')?.value||'').trim().toLowerCase();const status=$('#superUserStatus')?.value||'all';let visible=0;document.querySelectorAll('#superUserRows tr').forEach(r=>{const ok=(!q||String(r.dataset.userSearch||'').includes(q))&&(status==='all'||r.dataset.userStatus===status);r.style.display=ok?'':'none';if(ok)visible++});const count=$('#superUserCount');if(count)count.textContent=visible+' / '+users.length+' USERS'};$('#superUserSearch')?.addEventListener('input',applyUserFilter);$('#superUserStatus')?.addEventListener('change',applyUserFilter);applyUserFilter();
+    $('#superUserRows')?.addEventListener('click',e=>{
+      const btn=e.target.closest('button[data-super-action][data-user-id]');
+      if(!btn||btn.disabled)return;
+      const id=btn.dataset.userId;
+      const action=btn.dataset.superAction;
+      btn.disabled=true;
+      Promise.resolve(action==='role'?superRolePrompt(id):action==='ban'?superBan(id):superUnban(id)).finally(()=>{if(btn.isConnected)btn.disabled=false});
+    });
   }else if(section==='permissions'){
     const admins=users.filter(u=>(u.role&&u.role!=='STUDENT')||(Array.isArray(u.adminRoles)&&u.adminRoles.length));
     const counts=['SUPER_ADMIN','SCHOOL_ADMIN','GRADE_ADMIN','CLASS_ADMIN'].map(r=>({r,n:admins.filter(u=>u.role===r||(Array.isArray(u.adminRoles)&&u.adminRoles.includes(r))).length}));
