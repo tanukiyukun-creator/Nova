@@ -622,7 +622,7 @@ wss.on('connection',(ws,req)=>{
   const q=new URL(req.url,'http://localhost').searchParams;
   const u=userFromWsToken(q.get('token'));
   if(!u){ws.close(1008,'auth');return}
-  ws.userId=u.id;wsUsers.set(u.id,ws);
+  ws.userId=String(u.id);wsUsers.set(String(u.id),ws);
   ws.on('message',raw=>{
     try{
       const m=JSON.parse(String(raw));
