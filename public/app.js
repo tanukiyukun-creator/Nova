@@ -137,7 +137,7 @@ function superSection(section,btn){
         <div class="permission-note"><b>CLASS_ADMIN</b><p>クラス内の生徒を対象に選出。</p></div>
         <div class="permission-note"><b>GRADE_ADMIN</b><p>学年内のCLASS_ADMINを対象に選出。</p></div>
         <div class="permission-note"><b>SCHOOL_ADMIN</b><p>学校内のGRADE_ADMINを対象に選出。</p></div>
-        <p class="system-copy">投票は24時間。自分自身への投票は不可。過半数到達、または最多得票で決定し、同率1位は全員が選出されます。</p>
+        <p class="system-copy">投票は1週間。自分自身への投票は不可。過半数到達、または最多得票で決定し、同率1位は全員が選出されます。</p>
       </section>
       <section class="glass super-card span4"><div class="super-card-head"><div><small>REELECTION</small><h3>再選・欠員</h3></div></div>
         <div class="permission-note"><b>再選要求</b><p>一般ユーザーの30%以上の要求で再選を開始。</p></div>
