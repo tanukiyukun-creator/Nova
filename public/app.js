@@ -258,7 +258,9 @@ async function register(e){
     lastName:String(f.get('lastName')||'').trim(),
     firstName:String(f.get('firstName')||'').trim(),
     icon:$('#iconData')?.value||'',
-    password:f.get('password')
+    password:f.get('password'),
+    legalConsent:true,
+    legalVersion:NOVA_LEGAL_VERSION
   };
   try{
     setSession(await api('/api/register',{method:'POST',body:JSON.stringify(body)}));
