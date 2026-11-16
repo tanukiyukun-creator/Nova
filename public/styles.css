@@ -727,3 +727,11 @@ button:active,.btn:active{transform:scale(.98)}
 .line-friend-request-actions{display:flex;gap:5px;flex:0 0 auto}
 .line-friend-request-actions button{padding:6px 9px;border-radius:8px;background:#d9c18a;color:#17140e;font-size:10px;font-weight:700}
 .line-friend-request-actions button.reject{background:#252a33;color:#c8ccd3;border:1px solid rgba(255,255,255,.08)}
+
+/* Friend/profile avatars: keep the user's actual icon compact in chat lists. */
+.line-room .chat-avatar,.line-room .chat-avatar-fallback{width:42px;height:42px;flex:0 0 42px;border-radius:50%;object-fit:cover;display:grid;place-items:center;overflow:hidden}
+.line-room .chat-avatar{background:#171a22;border:1px solid rgba(255,255,255,.10)}
+.line-room .chat-avatar-fallback{font-size:12px;color:#d9d4c8;background:linear-gradient(145deg,#303541,#171a22);border:1px solid rgba(255,255,255,.08)}
+.line-header-avatar .chat-avatar,.line-header-avatar .chat-avatar-fallback{width:42px;height:42px;flex:0 0 42px;border-radius:50%;object-fit:cover;display:grid;place-items:center;overflow:hidden}
+.line-header-avatar .chat-avatar{background:#171a22;border:1px solid rgba(255,255,255,.10)}
+.line-header-avatar .chat-avatar-fallback{font-size:12px;color:#d9d4c8;background:linear-gradient(145deg,#303541,#171a22);border:1px solid rgba(255,255,255,.08)}
