@@ -452,13 +452,13 @@ async function pollFriendRequests(){
 function startGlobalFriendRequests(){
   if(window.novaGlobalFriendRequestTimer)clearInterval(window.novaGlobalFriendRequestTimer);
   pollFriendRequests();
-  window.novaGlobalFriendRequestTimer=setInterval(()=>pollFriendRequests(),3000);
+  window.novaGlobalFriendRequestTimer=setInterval(()=>pollFriendRequests(),10000);
 }
 let novaGlobalInboxTimer=null;
 function startGlobalChatInbox(){
   if(novaGlobalInboxTimer)clearInterval(novaGlobalInboxTimer);
   pollDirectInbox();
-  novaGlobalInboxTimer=setInterval(()=>pollDirectInbox(),3000);
+  novaGlobalInboxTimer=setInterval(()=>pollDirectInbox(),5000);
 }
 async function pollDirectInbox(){
   try{
@@ -489,11 +489,7 @@ async function chat(m){
   if(chatPollTimer)clearInterval(chatPollTimer);
   if(friendRequestPollTimer)clearInterval(friendRequestPollTimer);
   if(directInboxPollTimer)clearInterval(directInboxPollTimer);
-  chatPollTimer=setInterval(()=>refreshOpenChat(),1500);
-  await pollFriendRequests();
-  await pollDirectInbox();
-  directInboxPollTimer=setInterval(()=>pollDirectInbox(),3000);
-  friendRequestPollTimer=setInterval(()=>pollFriendRequests(),3000);
+  chatPollTimer=setInterval(()=>refreshOpenChat(),5000);
   wsConnect();
   const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(hasClientRole('CLASS_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
