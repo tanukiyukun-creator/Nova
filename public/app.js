@@ -40,8 +40,9 @@ async function render(skipAuthRefresh=false){
 async function renderSuperAdmin(){
   let state={users:[],schools:[],messages:[],friends:[],posts:[],events:[],tasks:[],schedules:[],elections:[],notifications:[],calls:[]};
   try{state=await api('/api/debug/state')}catch(x){document.body.innerHTML=`<div class="auth premium-auth"><div class="authbox glass"><div class="auth-logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div>NOVA<small>SYSTEM ADMIN</small></div></div><div class="auth-hero"><small>SUPER ADMIN</small><h1>管理画面を開けませんでした</h1><p>${esc(x.message||'認証セッションを確認してください')}</p><button class="btn alt" onclick="logout()">通常ログインへ</button></div></div></div>`;return}
-  const users=state.users||[], schools=state.schools||[];
-  const roleCount=r=>users.filter(u=>u.role===r||(Array.isArray(u.adminRoles)&&u.adminRoles.includes(r))).length;
+  const users=Array.isArray(state.users)?state.users:[];
+  const schools=Array.isArray(state.schools)?state.schools:[];
+  const roleCount=r=>users.filter(u=>u&& (u.role===r||(Array.isArray(u.adminRoles)&&u.adminRoles.includes(r)))).length;
   const recent=[...users].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,8);
   document.body.innerHTML=`
     <div class="super-admin-shell">
