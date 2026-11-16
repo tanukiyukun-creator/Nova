@@ -302,6 +302,8 @@ async function login(e){
 async function go(v){view=v;await render(true)}
 async function route(){const m=$('#main');if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='settings')return settings(m);return home(m)}
 let chatPollTimer=null;
+let friendRequestPollTimer=null;
+let lastIncomingFriendRequestIds=new Set();
 let homeSelectedDate=new Date();
 let homeClockTimer=null;
 function homeDay(delta){
@@ -426,9 +428,25 @@ async function refreshOpenChat(){
     if(added)scrollChatToBottom();
   }catch(e){console.warn('NOVA_CHAT_POLL_ERROR',e)}
 }
+async function pollFriendRequests(){
+  try{
+    const data=await api('/api/friend-requests');
+    const incoming=Array.isArray(data?.incoming)?data.incoming:[];
+    const ids=new Set(incoming.map(x=>String(x.id)));
+    const fresh=incoming.filter(x=>!lastIncomingFriendRequestIds.has(String(x.id)));
+    if(lastIncomingFriendRequestIds.size&&fresh.length){
+      fresh.forEach(x=>toast((x.user?.displayName||'相手')+'からフレンド申請が届きました'));
+      if(view==='chat')chat($('#main'));
+    }
+    lastIncomingFriendRequestIds=ids;
+  }catch{}
+}
 async function chat(m){
   if(chatPollTimer)clearInterval(chatPollTimer);
+  if(friendRequestPollTimer)clearInterval(friendRequestPollTimer);
   chatPollTimer=setInterval(()=>refreshOpenChat(),1500);
+  await pollFriendRequests();
+  friendRequestPollTimer=setInterval(()=>pollFriendRequests(),3000);
   wsConnect();
   const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
   if(hasClientRole('CLASS_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('SCHOOL_ADMIN'))rooms.push({id:'classadmin',title:'CLASS ADMIN',sub:'管理者トーク',icon:'A'});
