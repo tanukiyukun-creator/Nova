@@ -303,7 +303,9 @@ async function go(v){view=v;await render(true)}
 async function route(){const m=$('#main');if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='settings')return settings(m);return home(m)}
 let chatPollTimer=null;
 let friendRequestPollTimer=null;
+let directInboxPollTimer=null;
 let lastIncomingFriendRequestIds=new Set();
+let lastIncomingMessageIds=new Set();
 let homeSelectedDate=new Date();
 let homeClockTimer=null;
 function homeDay(delta){
@@ -441,11 +443,39 @@ async function pollFriendRequests(){
     lastIncomingFriendRequestIds=ids;
   }catch{}
 }
+async function pollDirectInbox(){
+  try{
+    const data=await api('/api/chats/inbox');
+    const messages=Array.isArray(data?.messages)?data.messages:[];
+    const fresh=messages.filter(x=>String(x?.id||'')&&!lastIncomingMessageIds.has(String(x.id)));
+    if(lastIncomingMessageIds.size){
+      for(const msg of fresh){
+        const otherId=String(msg.from||'');
+        if(otherId)mergeChatMessages(directChatCacheRoom(otherId),[],msg);
+        if(view==='chat'&&chatRoom==='friend'&&String(chatTarget)===otherId){
+          const box=$('#chatbox');
+          if(box&&!box.querySelector('[data-message-id="'+CSS.escape(String(msg.id))+'"]')){
+            const empty=box.querySelector('.chat-empty-state');
+            if(empty)box.innerHTML=messageBubble(msg);else box.insertAdjacentHTML('beforeend',messageBubble(msg));
+            scrollChatToBottom();
+          }
+        }else if(msg.fromName){
+          toast(msg.fromName+'から新しいメッセージが届きました');
+        }
+      }
+    }
+    messages.forEach(msg=>{if(msg?.id)lastIncomingMessageIds.add(String(msg.id))});
+    if(lastIncomingMessageIds.size>500)lastIncomingMessageIds=new Set([...lastIncomingMessageIds].slice(-300));
+  }catch(e){}
+}
 async function chat(m){
   if(chatPollTimer)clearInterval(chatPollTimer);
   if(friendRequestPollTimer)clearInterval(friendRequestPollTimer);
+  if(directInboxPollTimer)clearInterval(directInboxPollTimer);
   chatPollTimer=setInterval(()=>refreshOpenChat(),1500);
   await pollFriendRequests();
+  await pollDirectInbox();
+  directInboxPollTimer=setInterval(()=>pollDirectInbox(),3000);
   friendRequestPollTimer=setInterval(()=>pollFriendRequests(),3000);
   wsConnect();
   const rooms=[{id:'class',title:me.grade+'年'+me.className+'組',sub:'クラス全員',icon:'C'}];
