@@ -738,7 +738,7 @@ if(!x.message||!['message','group_message','class_message'].includes(x.type))ret
 const id=String(x.message.id||'');if(!id)return;
 // WebSocketで受信した個人メッセージは、画面を離れていても必ず端末キャッシュへ保存する。
 // 「返信が届いた直後に別画面へ移動」した場合でも、次に戻ったときに復元できるようにする。
-const cacheRoom=x.type==='message'?directChatCacheRoom(String(x.message.from)===String(me.id)?x.message.to:x.message.from):(x.message.talkId?((x.type==='group_message')?'group:'+String(x.message.talkId):'class'):chatRoom);
+const cacheRoom=x.type==='message'?directChatCacheRoom(String(x.message.from)===String(me.id)?x.message.to:x.message.from):(x.type==='class_message'?'class':(x.type==='group_message'?(x.message.room==='class'?'class':(x.message.talkId?'group:'+String(x.message.talkId):chatRoom)):chatRoom));
 mergeChatMessages(cacheRoom,[],x.message);
 if(view!=='chat')return;
 if(!box)return;
