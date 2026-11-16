@@ -619,7 +619,13 @@ app.post('/api/super/users/:id/ban',auth,(req,res)=>{
   if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});
   if(hasRole(u,'SUPER_ADMIN'))return res.status(400).json({error:'SUPER ADMINはBANできません'});
   u.banned=true;u.bannedAt=Date.now();u.banReason=String(req.body.reason||'SUPER ADMINによる利用停止');
-  save(db);res.json({ok:true,user:pub(u)});
+  save(db);
+  const targetWs=wsUsers.get(String(u.id));
+  if(targetWs?.readyState===1){
+    try{targetWs.send(JSON.stringify({type:'account_banned',reason:u.banReason}));}catch{}
+    setTimeout(()=>{try{targetWs.close(4003,'banned')}catch{}},100);
+  }
+  res.json({ok:true,user:pub(u)});
 });
 app.post('/api/super/users/:id/unban',auth,(req,res)=>{
   if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).json({error:'権限がありません'});
