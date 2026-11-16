@@ -12,7 +12,7 @@ function persistUser(u){
 }
 const novaIconHtml=()=>'<img class="nova-brand-icon" src="/icon.svg?v=5" alt="">';
 const profileFallbackHtml=()=>'<span class="profile-fallback" aria-hidden="true">●</span>';
-const avatarHtml=(u,size='')=>u?.icon?'<img class="chat-avatar '+size+'" src="'+esc(u.icon)+'" alt="">':'<span class="chat-avatar-fallback '+size+'">●</span>';
+const avatarHtml=(u,size='')=>{const icon=String(u?.icon||'').trim();return icon?'<img class="chat-avatar '+size+'" src="'+esc(icon)+'" alt="">':'<span class="chat-avatar-fallback '+size+'" aria-hidden="true">👤</span>'};
 const bookIconHtml=()=>'<span class="book-fallback" aria-hidden="true">▤</span>';
 const schoolIconHtml=()=>'<span class="school-fallback" aria-hidden="true">⌂</span>';
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
