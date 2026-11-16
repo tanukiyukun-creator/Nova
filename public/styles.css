@@ -735,3 +735,16 @@ button:active,.btn:active{transform:scale(.98)}
 .line-header-avatar .chat-avatar,.line-header-avatar .chat-avatar-fallback{width:42px;height:42px;flex:0 0 42px;border-radius:50%;object-fit:cover;display:grid;place-items:center;overflow:hidden}
 .line-header-avatar .chat-avatar{background:#171a22;border:1px solid rgba(255,255,255,.10)}
 .line-header-avatar .chat-avatar-fallback{font-size:12px;color:#d9d4c8;background:linear-gradient(145deg,#303541,#171a22);border:1px solid rgba(255,255,255,.08)}
+
+.home-friend-request-card{margin-top:14px}
+.home-friend-request-list{display:flex;flex-direction:column;gap:10px}
+.home-friend-request-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.home-friend-request-row:last-child{border-bottom:0}
+.home-friend-request-user{display:flex;align-items:center;gap:11px;min-width:0}
+.home-friend-request-user>div{min-width:0}
+.home-friend-request-user b,.home-friend-request-user small{display:block}
+.home-friend-request-user small{margin-top:3px;color:var(--muted);font-size:11px}
+.home-friend-request-actions{display:flex;gap:7px;flex:0 0 auto}
+.home-friend-request-actions button{padding:7px 11px;border-radius:9px;background:var(--gold);color:#15130f;font-weight:700}
+.home-friend-request-actions button.reject{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+@media(max-width:650px){.home-friend-request-row{align-items:flex-start;flex-direction:column}.home-friend-request-actions{width:100%}.home-friend-request-actions button{flex:1}}
