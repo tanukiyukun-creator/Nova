@@ -231,9 +231,25 @@ app.patch('/api/me',auth,(req,res)=>{
   }catch(e){console.error('ME_UPDATE_ERROR',e);res.status(500).json({error:'設定の保存に失敗しました'})}
 });
 
-app.get('/api/users/search',auth,(req,res)=>{const db=load(),q=(req.query.q||'').toLowerCase();res.json(db.users.filter(u=>u.id!==req.user.id&&(!q||u.displayName.toLowerCase().includes(q))).slice(0,30).map(pub))});
+app.get('/api/users/search',auth,(req,res)=>{
+  const db=load(),meId=String(req.user.id),q=String(req.query.q||'').trim().toLowerCase();
+  const normalize=v=>String(v??'').toLowerCase().replace(/\\u3000/g,' ');
+  const list=db.users.filter(u=>{
+    if(String(u.id)===meId)return false;
+    if(!q)return true;
+    const hay=[
+      u.displayName,u.lastName,u.firstName,u.schoolName,u.grade,u.className,u.attendanceNo
+    ].map(normalize).join(' ');
+    return hay.includes(q);
+  }).slice(0,30).map(pub);
+  res.json(list);
+});
 app.post('/api/friends/:id',auth,(req,res)=>{const db=load();db.friends=Array.isArray(db.friends)?db.friends:[];db.friendRequests=Array.isArray(db.friendRequests)?db.friendRequests:[];db.notifications=Array.isArray(db.notifications)?db.notifications:[];const target=String(req.params.id);const meId=String(req.user.id);if(target===meId)return res.status(400).json({error:'自分には申請できません'});const targetUser=db.users.find(u=>String(u.id)===target);if(!targetUser)return res.status(404).json({error:'ユーザーが見つかりません'});if(db.friends.some(f=>(String(f.a)===meId&&String(f.b)===target)||(String(f.a)===target&&String(f.b)===meId)))return res.status(409).json({error:'すでに友達です'});const reverse=db.friendRequests.find(x=>String(x.from)===target&&String(x.to)===meId);if(reverse){db.friends.push({a:meId,b:target,createdAt:Date.now()});db.friendRequests=db.friendRequests.filter(x=>x.id!==reverse.id);const accepter=db.users.find(u=>String(u.id)===meId)||req.user;notify(db,targetUser.id,'friend_accepted','フレンド申請を承認',accepter.displayName+'がフレンド申請を承認しました',{fromId:accepter.id,chatType:'friend_accepted'});save(db);const targetWs=wsUsers?.get(String(targetUser.id));if(targetWs?.readyState===1)targetWs.send(JSON.stringify({type:'friend_accepted',user:{id:accepter.id,displayName:accepter.displayName,icon:accepter.icon||''}}));return res.json({ok:true,accepted:true})}if(db.friendRequests.some(x=>String(x.from)===meId&&String(x.to)===target))return res.status(409).json({error:'フレンド申請済みです'});const request={id:id(),from:meId,to:target,createdAt:Date.now()};db.friendRequests.push(request);const sender=db.users.find(u=>String(u.id)===meId)||req.user;notify(db,target,'friend_request','フレンド申請',sender.displayName+'からフレンド申請が届きました',{requestId:request.id,fromId:sender.id,chatType:'friend_request'});save(db);const targetWs=wsUsers?.get(target);if(targetWs?.readyState===1)targetWs.send(JSON.stringify({type:'friend_request',request:{...request,fromName:sender.displayName,fromIcon:sender.icon||''}}));return res.json({ok:true,pending:true})});
-app.get('/api/friends',auth,(req,res)=>{const db=load();const ids=db.friends.filter(f=>f.a===req.user.id||f.b===req.user.id).map(f=>f.a===req.user.id?f.b:f.a);res.json(db.users.filter(u=>ids.includes(u.id)).map(pub))});
+app.get('/api/friends',auth,(req,res)=>{
+  const db=load(),meId=String(req.user.id);
+  const ids=(db.friends||[]).filter(f=>String(f.a)===meId||String(f.b)===meId).map(f=>String(f.a)===meId?String(f.b):String(f.a));
+  res.json(db.users.filter(u=>ids.includes(String(u.id))).map(pub));
+});
 app.get('/api/friend-requests',auth,(req,res)=>{
   const db=load(),meId=String(req.user.id);
   const incoming=(db.friendRequests||[]).filter(x=>String(x.to)===meId).map(x=>({...x,user:pub(db.users.find(u=>String(u.id)===String(x.from)))}));
@@ -242,7 +258,10 @@ app.get('/api/friend-requests',auth,(req,res)=>{
 });
 app.post('/api/friend-requests/:id/accept',auth,(req,res)=>{
   const db=load(),meId=String(req.user.id);
-  const x=(db.friendRequests||[]).find(x=>String(x.id)===String(req.params.id)&&String(x.to)===meId);
+  db.friends=Array.isArray(db.friends)?db.friends:[];
+  db.friendRequests=Array.isArray(db.friendRequests)?db.friendRequests:[];
+  db.notifications=Array.isArray(db.notifications)?db.notifications:[];
+  const x=db.friendRequests.find(x=>String(x.id)===String(req.params.id)&&String(x.to)===meId);
   if(!x)return res.status(404).json({error:'申請が見つかりません'});
   if(!db.friends.some(f=>(String(f.a)===String(x.from)&&String(f.b)===String(x.to))||(String(f.a)===String(x.to)&&String(f.b)===String(x.from))))db.friends.push({a:x.from,b:x.to,createdAt:Date.now()});
   db.friendRequests=db.friendRequests.filter(y=>String(y.id)!==String(x.id));
@@ -258,7 +277,8 @@ app.post('/api/friend-requests/:id/accept',auth,(req,res)=>{
 });
 app.post('/api/friend-requests/:id/reject',auth,(req,res)=>{
   const db=load(),meId=String(req.user.id);
-  const x=(db.friendRequests||[]).find(x=>String(x.id)===String(req.params.id)&&String(x.to)===meId);
+  db.friendRequests=Array.isArray(db.friendRequests)?db.friendRequests:[];
+  const x=db.friendRequests.find(x=>String(x.id)===String(req.params.id)&&String(x.to)===meId);
   if(!x)return res.status(404).json({error:'申請が見つかりません'});
   db.friendRequests=db.friendRequests.filter(y=>String(y.id)!==String(x.id));
   save(db);
