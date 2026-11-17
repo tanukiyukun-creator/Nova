@@ -658,7 +658,46 @@ app.post('/api/elections/:id/candidate',auth,(req,res)=>{try{const db=load(),e=d
 app.post('/api/elections/:id/vote',auth,(req,res)=>{try{const db=load(),e=db.elections.find(x=>x.id===req.params.id);if(!e)return res.status(404).json({error:'選挙が見つかりません'});if(e.status==='OPEN'&&e.endsAt<=Date.now()){finalizeElection(db,e);save(db);return res.status(400).json({error:'投票期間が終了しました'})}if(e.status!=='OPEN')return res.status(400).json({error:'投票期間が終了しました'});if(!electionVoters(db,e).some(u=>String(u.id)===String(req.user.id)))return res.status(403).json({error:'この選挙の投票資格がありません'});if(e.voted.includes(req.user.id))return res.status(400).json({error:'すでに投票しています'});const c=e.candidates.find(c=>c.id===req.body.candidateId);if(!c)return res.status(400).json({error:'候補者が不正です'});if(c.userId===req.user.id)return res.status(400).json({error:'自分には投票できません'});c.votes++;e.voted.push(req.user.id);save(db);res.json({ok:true})}catch(e){res.status(400).json({error:e.message})}});
 app.post('/api/elections/:id/reelection-request',auth,(req,res)=>{const db=load(),e=db.elections.find(x=>x.id===req.params.id);if(!e)return res.status(404).json({error:'選挙が見つかりません'});e.reelectionRequests=Array.isArray(e.reelectionRequests)?e.reelectionRequests:[];const isSchoolOrSuper=hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'SUPER_ADMIN');if(!isSchoolOrSuper){const students=db.users.filter(u=>u.role==='STUDENT'&&u.schoolId===e.schoolId&&(e.grade==null||u.grade===e.grade)&&(e.className==null||u.className===e.className));if(!students.some(u=>String(u.id)===String(req.user.id)))return res.status(403).json({error:'生徒本人のみ変更要望を送信できます'});if(!e.reelectionRequests.includes(req.user.id))e.reelectionRequests.push(req.user.id);const threshold=Math.floor(students.length/2)+1;if(e.reelectionRequests.length<threshold){save(db);return res.json({ok:true,started:false,requests:e.reelectionRequests.length,threshold})}}try{startElection(db,req.user,e.type,e.candidates.map(c=>c.userId));e.autoReelection=true;e.reelectionRequests=[];save(db);return res.json({ok:true,started:true,requests:0,threshold:0})}catch(err){save(db);return res.status(400).json({error:err.message})}});
 app.post('/api/me/leave-admin',auth,(req,res)=>{const db=load(),u=db.users.find(x=>x.id===req.user.id);const role=String(req.body.role||'');if(!['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN'].includes(role)||!hasRole(u,role))return res.status(400).json({error:'その管理者権限はありません'});u.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles.filter(x=>x!==role):[];if(u.role===role)u.role='STUDENT';triggerReelectionForRole(db,role,u);syncAdminTalks(db);save(db);res.json({ok:true,user:pub(u)});});
-app.get('/api/study/books',auth,(req,res)=>res.json([{id:'target1200',name:'ターゲット1200',path:'/data/target1200.txt'},{id:'target1900',name:'ターゲット1900',path:'/data/target1900.txt'},{id:'tekkyoku',name:'鉄壁',path:'/data/tekkyoku.txt'},{id:'irohani',name:'いろはにほへと古文単語',path:'/data/irohani.txt'}]));
+function loadStudyEntries(id,file){
+  const p=path.join(__dirname,'data',file);
+  if(!fs.existsSync(p))return [];
+  const lines=fs.readFileSync(p,'utf8').replace(/^\\uFEFF/,'').split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  if(id==='irohani'){
+    const out=[];
+    for(let i=0;i<lines.length;i++){
+      const word=lines[i];
+      if(word.startsWith('【'))continue;
+      const meanings=[];
+      for(let j=i+1;j<Math.min(i+15,lines.length);j++){
+        const line=lines[j];
+        if(line.startsWith('【KEY】'))break;
+        if(line.startsWith('【'))break;
+        if(/^[①-⑳]/.test(line))meanings.push(line);
+        else if(meanings.length)meanings.push(line);
+      }
+      if(meanings.length)out.push({no:out.length+1,q:word,a:meanings.join('；'),type:'jp'});
+    }
+    return out;
+  }
+  const out=[];
+  for(const line of lines){
+    if(/^(英単語|No\\.?)(?:\\s|$)/.test(line))continue;
+    let m=line.match(/^(\\d+)\\s+(.+?)\\s{2,}(.+)$/);
+    if(!m)m=line.match(/^(\\d+)\\t(.+?)\\t(.+)$/);
+    if(!m)m=line.match(/^(\\d+)\\s+([^\\s]+)\\s+(.+)$/);
+    if(m)out.push({no:Number(m[1]),q:m[2].trim(),a:m[3].trim(),type:'en'});
+  }
+  return out;
+}
+app.get('/api/study/books',auth,(req,res)=>{
+  const defs=[
+    {id:'target1200',name:'ターゲット1200',file:'target1200.txt'},
+    {id:'target1900',name:'ターゲット1900',file:'target1900.txt'},
+    {id:'tekkyoku',name:'鉄壁',file:'tekkyoku.txt'},
+    {id:'irohani',name:'いろはにほへと古文単語',file:'irohani.txt'}
+  ];
+  res.json(defs.map(b=>({...b,path:'/data/'+b.file,entries:loadStudyEntries(b.id,b.file)})));
+});
 app.get('/data/:file', (req,res)=>{const base=path.join(__dirname,'data'); const file=path.basename(req.params.file); const allowed=new Set(['target1200.txt','target1900.txt','tekkyoku.txt','irohani.txt']); if(!allowed.has(file))return res.status(404).end(); const p=path.join(base,file); if(!fs.existsSync(p))return res.status(404).json({error:'単語帳データが見つかりません'}); res.sendFile(p)});
 app.get('/api/admins',auth,(req,res)=>{const db=load();res.json(db.users.filter(u=>u.schoolId===req.user.schoolId&&(hasRole(u,'CLASS_ADMIN')||hasRole(u,'GRADE_ADMIN')||hasRole(u,'SCHOOL_ADMIN')||hasRole(u,'SUPER_ADMIN'))).map(pub))});
 app.get('/api/debug/state',auth,(req,res)=>{if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).end();const db=load();res.json({...db,users:db.users.map(pub)});});
