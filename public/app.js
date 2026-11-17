@@ -299,7 +299,7 @@ async function login(e){
     toast('ログインしました');
   }catch(x){toast(x.message)}
 }
-async async function go(v){view=v;if(v==='chat')chatPaneOpen=false;try{await render(true)}catch(e){console.error(e);toast(e.message||'画面を開けませんでした')}}
+async function go(v){view=v;if(v==='chat')chatPaneOpen=false;try{await render(true)}catch(e){console.error(e);toast(e.message||'画面を開けませんでした')}}
 window.go=go
 async function route(){const m=$("#main");if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='board')return board(m);if(view==='settings')return settings(m);return home(m)}
 let chatPollTimer=null;
