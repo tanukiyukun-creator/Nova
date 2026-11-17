@@ -42,7 +42,7 @@ function showBannedScreen(reason='Novaの利用規約により、このアカウ
   document.body.innerHTML='<div class="auth premium-auth"><div class="authbox glass"><div class="auth-logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div>NOVA<small>ACCOUNT STATUS</small></div></div><div class="auth-hero"><small>ACCOUNT BANNED</small><h1>このアカウントはBANされています</h1><p>'+esc(reason)+'</p><p class="sub">このアカウントではNovaを利用できません。</p></div></div></div>';
 }
 async function render(skipAuthRefresh=false){
-  if(me){startGlobalChatInbox();startGlobalFriendRequests();}if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&hasClientRole('SUPER_ADMIN'))return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['board','▤','掲示板'],['settings','⋯','設定'],...(hasClientRole('SUPER_ADMIN')?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',board:'掲示板',settings:'設定'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':profileFallbackHtml()}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['board','▤','掲示板'],['settings','⋯','設定']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
+  if(me){startGlobalChatInbox();startGlobalFriendRequests();}if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&hasClientRole('SUPER_ADMIN'))return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['board','▤','掲示板'],['settings','⋯','設定'],...(hasClientRole('SUPER_ADMIN')?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="window.go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',board:'掲示板',settings:'設定'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':profileFallbackHtml()}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['board','▤','掲示板'],['settings','⋯','設定']].map(x=>`<button onclick="window.go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
 async function renderSuperAdmin(){
   let state={users:[],schools:[],messages:[],friends:[],posts:[],events:[],tasks:[],schedules:[],elections:[],notifications:[],calls:[]};
   try{state=await api('/api/debug/state')}catch(x){document.body.innerHTML=`<div class="auth premium-auth"><div class="authbox glass"><div class="auth-logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div>NOVA<small>SYSTEM ADMIN</small></div></div><div class="auth-hero"><small>SUPER ADMIN</small><h1>管理画面を開けませんでした</h1><p>${esc(x.message||'認証セッションを確認してください')}</p><button class="btn alt" onclick="logout()">通常ログインへ</button></div></div></div>`;return}
@@ -64,7 +64,7 @@ async function renderSuperAdmin(){
           <button class="super-nav" onclick="superSection('safety',this)">⚠ <span>通報・安全管理</span></button>
           <button class="super-nav" onclick="superSection('system',this)">⚙ <span>システム</span></button>
         </nav>
-        <div class="super-side-bottom"><button onclick="go('home')">← Novaへ戻る</button><button onclick="logout()">↪ ログアウト</button></div>
+        <div class="super-side-bottom"><button onclick="window.go('home')">← Novaへ戻る</button><button onclick="logout()">↪ ログアウト</button></div>
       </aside>
       <main class="super-main">
         <header class="super-top">
@@ -299,7 +299,8 @@ async function login(e){
     toast('ログインしました');
   }catch(x){toast(x.message)}
 }
-async function go(v){view=v;await render(true)}
+async function go(v){view=v;try{await render(true)}catch(e){console.error(e);toast(e.message||'画面を開けませんでした')}}
+window.go=go
 async function route(){const m=$("#main");if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='board')return board(m);if(view==='settings')return settings(m);return home(m)}
 let chatPollTimer=null;
 let friendRequestPollTimer=null;
@@ -361,7 +362,7 @@ async function home(m){
   (changes||[]).filter(c=>c.date===dateKey&&c.type==='temporary'&&!c.scheduleId).forEach(c=>daySchedule.push({id:c.id,period:c.period||'',subject:c.subject||'臨時授業',room:c.room||'',day:homeDayKey(selected)}));
   daySchedule.sort((a,b)=>Number(a.period||0)-Number(b.period||0));
   const scheduleHtml=daySchedule.map(x=>`<div class="home-schedule-row"><span class="period">${esc(x.period)}限</span><div><b>${esc(x.subject||'授業')}</b><small>${esc(x.room||'')}</small></div></div>`).join('')||'<div class="home-empty">この日の時間割は未登録です</div>';
-  const taskHtml=unfinished.map(t=>`<button class="home-task-row" onclick="go('schedule')"><span class="task-dot"></span><div><b>${esc(t.title||'課題')}</b><small>${esc(t.subject||'課題')} · ${homeFormatTaskDate(t)}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未完了の課題はありません</div>';
+  const taskHtml=unfinished.map(t=>`<button class="home-task-row" onclick="window.go('schedule')"><span class="task-dot"></span><div><b>${esc(t.title||'課題')}</b><small>${esc(t.subject||'課題')} · ${homeFormatTaskDate(t)}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未完了の課題はありません</div>';
   const chatHtml=unreadChats.map(n=>`<button class="home-unread-row" onclick="openNotificationChat(${JSON.stringify(n)})"><span class="unread-dot"></span><div><b>${esc(n.title||'新しいメッセージ')}</b><small>${esc(n.body||'未読のメッセージがあります')}</small></div><span>›</span></button>`).join('')||'<div class="home-empty">未読のチャットはありません</div>';
   const noticeHtml=notices.map(n=>`<div class="home-notice-row"><span class="notice-mark">•</span><div><b>${esc(n.title||'お知らせ')}</b><small>${esc(n.body||'')}</small></div></div>`).join('')||'<div class="home-empty">新しいお知らせはありません</div>';
   m.innerHTML=`<div class="nova-home nova-home-compact">
@@ -378,16 +379,16 @@ async function home(m){
     </section>
     <div class="home-two-col">
       <section class="home-card glass">
-        <div class="compact-card-head"><div><span class="card-icon">□</span><div><b>終わってない課題</b><small>${unfinished.length}件</small></div></div><button class="mini-link" onclick="go('schedule')">一覧 ›</button></div>
+        <div class="compact-card-head"><div><span class="card-icon">□</span><div><b>終わってない課題</b><small>${unfinished.length}件</small></div></div><button class="mini-link" onclick="window.go('schedule')">一覧 ›</button></div>
         <div class="home-list">${taskHtml}</div>
       </section>
       <section class="home-card glass">
-        <div class="compact-card-head"><div><span class="card-icon">◌</span><div><b>未読のチャット</b><small>${unreadChats.length}件</small></div></div><button class="mini-link" onclick="go('chat')">チャット ›</button></div>
+        <div class="compact-card-head"><div><span class="card-icon">◌</span><div><b>未読のチャット</b><small>${unreadChats.length}件</small></div></div><button class="mini-link" onclick="window.go('chat')">チャット ›</button></div>
         <div class="home-list">${chatHtml}</div>
       </section>
     </div>
     <section class="home-card glass home-friend-request-card">
-      <div class="compact-card-head"><div><span class="card-icon">♙</span><div><b>フレンド申請</b><small>${incomingFriendRequests.length}件</small></div></div><button class="mini-link" onclick="go('chat')">トークで確認 ›</button></div>
+      <div class="compact-card-head"><div><span class="card-icon">♙</span><div><b>フレンド申請</b><small>${incomingFriendRequests.length}件</small></div></div><button class="mini-link" onclick="window.go('chat')">トークで確認 ›</button></div>
       <div class="home-friend-request-list">${incomingFriendRequests.map(x=>'<div class="home-friend-request-row"><div class="home-friend-request-user">'+avatarHtml(x.user)+'<div><b>'+esc(x.user?.displayName||'メンバー')+'</b><small>フレンド申請が届いています</small></div></div><div class="home-friend-request-actions"><button onclick="acceptFriendRequest(\''+esc(x.id)+'\');event.stopPropagation()">承認</button><button class="reject" onclick="rejectFriendRequest(\''+esc(x.id)+'\');event.stopPropagation()">拒否</button></div></div>').join('')||'<div class="home-empty">新しいフレンド申請はありません</div>'}</div>
     </section>
     <section class="home-card glass home-notice-card">
