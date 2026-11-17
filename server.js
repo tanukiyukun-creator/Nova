@@ -419,6 +419,14 @@ app.post('/api/push/unsubscribe',auth,(req,res)=>{
   u.pushSubscriptions=Array.isArray(u.pushSubscriptions)?u.pushSubscriptions.filter(x=>x.endpoint!==endpoint):[];
   save(db);res.json({ok:true});
 });
+app.post('/api/push/test',auth,async(req,res)=>{
+  if(!webPushReady)return res.status(503).json({error:'プッシュ通知のサーバー設定が未完了です'});
+  const n=notify(load(),req.user.id,'test','Novaテスト通知','プッシュ通知が正常に届いています',{chatType:'test'});
+  const db=load();db.notifications.unshift?null:null;
+  save(db);
+  try{await sendPushNotification(req.user.id,{title:'Novaテスト通知',body:'プッシュ通知が正常に届いています',data:{type:'test',chatType:'test'}});res.json({ok:true})}
+  catch(e){res.status(500).json({error:'テスト通知の送信に失敗しました'})}
+});
 app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifications.filter(n=>n.userId===req.user.id).slice(0,100))});
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
 function ensureInitialClassElection(db,user){const hasClassAdmin=db.users.some(u=>sameGroup(u,user)&&hasRole(u,'CLASS_ADMIN'));if(hasClassAdmin)return null;const scope=electionScope('CLASS_ADMIN',user);const open=db.elections.find(e=>e.status==='OPEN'&&e.type==='CLASS_ADMIN'&&e.schoolId===scope.schoolId&&e.grade===scope.grade&&e.className===scope.className);if(open)return open;const voters=electionVoters(db,{type:'CLASS_ADMIN',...scope});if(!voters.length)return null;const e={id:id(),type:'CLASS_ADMIN',...scope,candidates:[],voted:[],eligibleVoterIds:voters.map(u=>u.id),createdAt:Date.now(),endsAt:Date.now()+604800000,status:'OPEN',reelectionRequests:[],initialElection:true};db.elections.push(e);return e}
@@ -874,7 +882,7 @@ wss.on('connection',(ws,req)=>{
     try{
       const m=JSON.parse(String(raw));
       if(m.type==='call_signal'&&m.toUserId){
-        const payload={...m,fromUserId:u.id};
+        const payload={...m,fromUserId:u.id,fromName:u.displayName,fromIcon:u.icon||''};
         const target=wsUsers.get(String(m.toUserId));
         if(target?.readyState===1)target.send(JSON.stringify(payload));
         else{
@@ -882,7 +890,7 @@ wss.on('connection',(ws,req)=>{
           if(m.action==='offer'){const db=load();notify(db,m.toUserId,'call','着信',u.displayName+'から'+(m.mode==='video'?'ビデオ通話':'音声通話')+'の着信があります',{fromId:u.id,callId:m.callId,mode:m.mode,chatType:'call'});save(db)}
         }
       }else if(m.type==='call_signal'&&Array.isArray(m.toUserIds)){
-        const payload={...m,fromUserId:u.id};
+        const payload={...m,fromUserId:u.id,fromName:u.displayName,fromIcon:u.icon||''};
         [...new Set(m.toUserIds.map(String).filter(id=>id!==String(u.id)))].forEach(id=>{
           const target=wsUsers.get(id);
           if(target?.readyState===1)target.send(JSON.stringify(payload));
