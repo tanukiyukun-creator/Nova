@@ -421,11 +421,10 @@ app.post('/api/push/unsubscribe',auth,(req,res)=>{
 });
 app.post('/api/push/test',auth,async(req,res)=>{
   if(!webPushReady)return res.status(503).json({error:'プッシュ通知のサーバー設定が未完了です'});
-  const n=notify(load(),req.user.id,'test','Novaテスト通知','プッシュ通知が正常に届いています',{chatType:'test'});
-  const db=load();db.notifications.unshift?null:null;
-  save(db);
-  try{await sendPushNotification(req.user.id,{title:'Novaテスト通知',body:'プッシュ通知が正常に届いています',data:{type:'test',chatType:'test'}});res.json({ok:true})}
-  catch(e){res.status(500).json({error:'テスト通知の送信に失敗しました'})}
+  try{
+    await sendPushNotification(req.user.id,{title:'Novaテスト通知',body:'プッシュ通知が正常に届いています',data:{type:'test',chatType:'test'}});
+    res.json({ok:true});
+  }catch(e){res.status(500).json({error:'テスト通知の送信に失敗しました'})}
 });
 app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifications.filter(n=>n.userId===req.user.id).slice(0,100))});
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
