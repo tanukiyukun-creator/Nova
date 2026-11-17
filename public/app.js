@@ -299,7 +299,7 @@ async function login(e){
     toast('ログインしました');
   }catch(x){toast(x.message)}
 }
-async function go(v){view=v;try{await render(true)}catch(e){console.error(e);toast(e.message||'画面を開けませんでした')}}
+async async function go(v){view=v;if(v==='chat')chatPaneOpen=false;try{await render(true)}catch(e){console.error(e);toast(e.message||'画面を開けませんでした')}}
 window.go=go
 async function route(){const m=$("#main");if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='board')return board(m);if(view==='settings')return settings(m);return home(m)}
 let chatPollTimer=null;
@@ -403,7 +403,8 @@ async function home(m){
 }
 let chatRoom='class';
 let chatTarget=null;
-function resetChatForCurrentUser(){chatRoom='class';chatTarget=null;currentChat=null;friends=[];}
+let chatPaneOpen=false;
+function resetChatForCurrentUser(){chatRoom='class';chatTarget=null;chatPaneOpen=false;currentChat=null;friends=[];}
 async function refreshOpenChat(){
   if(view!=='chat'||!$('#chatbox'))return;
   try{
@@ -504,7 +505,7 @@ async function chat(m){
   const selectedFriend=chatRoom==='friend'&&chatTarget?friends.find(x=>x.id===chatTarget):null;
   const selectedGroup=chatRoom.startsWith('group:')?groups.find(x=>x.id===chatRoom.slice(6)):null;
   const room=rooms.find(r=>r.id===chatRoom);
-  const mobileChatOpen=!!(room||selectedFriend||selectedGroup);
+  const mobileChatOpen=chatPaneOpen;
   const title=selectedFriend?.displayName||selectedGroup?.name||room?.title||'トーク';
   const sub=selectedFriend?'個人トーク':selectedGroup?(selectedGroup.memberIds.length+'人のグループ'):room?.sub||'';
   let boxHtml=''; try{boxHtml=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom)}catch(e){boxHtml='<div class="chat-empty-state"><b>トークを読み込めませんでした</b><small>'+esc(e.message||'通信エラー')+'</small></div>'}
@@ -707,8 +708,8 @@ async function startElectionPrompt(room){
     toast(e.message);
   }
 }
-async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
-async function closeMobileChat(){chatTarget=null;chatRoom='class';await render(true)}
+async function selectChatRoom(room){chatRoom=room;chatTarget=null;chatPaneOpen=true;await render(true)}
+async function closeMobileChat(){chatPaneOpen=false;await render(true)}
 async function groupChatHtml(room,fallbackMessage=null){
   let data;
   if(room==='class')data=await api('/api/talks/class');
@@ -751,13 +752,13 @@ async function openElectionModal(){
 function closeElectionModal(){document.getElementById('novaElectionModal')?.remove()}
 async function voteElectionFromModal(electionId,candidateId){try{await api('/api/elections/'+electionId+'/vote',{method:'POST',body:JSON.stringify({candidateId})});toast('投票しました');closeElectionModal();await render(true);setTimeout(openElectionModal,50)}catch(e){toast(e.message)}}
 async function nominateElection(electionId){try{await api('/api/elections/'+electionId+'/candidate',{method:'POST',body:'{}'});toast('立候補しました');closeElectionModal();await render(true);setTimeout(openElectionModal,50)}catch(e){toast(e.message)}}
-async function openChat(id2){chatRoom='friend';chatTarget=id2;await render(true)}
+async function openChat(id2){chatRoom='friend';chatTarget=id2;chatPaneOpen=true;await render(true)}
 async function openNotificationChat(n){
   try{
-    if(n?.chatType==='direct'&&n.fromId){chatRoom='friend';chatTarget=n.fromId;await render(true);return}
-    if(n?.chatType==='talk'&&n.room){chatRoom=n.room;chatTarget=null;await render(true);return}
+    if(n?.chatType==='direct'&&n.fromId){chatRoom='friend';chatTarget=n.fromId;chatPaneOpen=true;await render(true);return}
+    if(n?.chatType==='talk'&&n.room){chatRoom=n.room;chatTarget=null;chatPaneOpen=true;await render(true);return}
   }catch(e){console.warn('NOVA_NOTIFICATION_CHAT_ERROR',e)}
-  chatRoom='class';chatTarget=null;await render(true)
+  chatRoom='class';chatTarget=null;chatPaneOpen=true;await render(true)
 }
 function messageBubble(x){
   const mine=String(x.from||'')===String(me.id||'');
