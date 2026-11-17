@@ -447,7 +447,13 @@ function ensureTalk(db,user,room){
   talk.schoolId=user.schoolId;
   talk.schoolName=user.schoolName;
   if(room==='school')db.users.filter(x=>sameSchool(x)).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
-  if(room==='class')db.users.filter(x=>sameGroup(x,user)).forEach(x=>{if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id)});
+  if(room==='class'){
+    if(!Array.isArray(talk.removedMemberIds))talk.removedMemberIds=[];
+    db.users.filter(x=>sameGroup(x,user)&&!talk.removedMemberIds.includes(x.id)).forEach(x=>{
+      if(!talk.memberIds.includes(x.id))talk.memberIds.push(x.id);
+    });
+    talk.memberIds=talk.memberIds.filter(uid=>db.users.some(x=>String(x.id)===String(uid)&&sameGroup(x,user)&&!talk.removedMemberIds.includes(x.id)));
+  }
   if(room==='classadmin'){
     const allowed=db.users.filter(x=>sameGroup(x,user)&&(hasRole(x,'CLASS_ADMIN')||hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
     talk.memberIds=talk.memberIds.filter(x=>allowed.includes(x));
@@ -460,6 +466,37 @@ function ensureTalk(db,user,room){
   }
   return talk;
 }
+app.post('/api/talks/:room/members',auth,(req,res)=>{
+  try{
+    const room=String(req.params.room);
+    if(room!=='class')return res.status(400).json({error:'このトークのメンバーは変更できません'});
+    const db=load(),talk=ensureTalk(db,req.user,'class');
+    if(!hasRole(req.user,'CLASS_ADMIN')||!sameGroup(req.user,talk))return res.status(403).json({error:'CLASS ADMIN権限が必要です'});
+    const uid=String(req.body.userId||'');
+    const target=db.users.find(u=>String(u.id)===uid);
+    if(!target)return res.status(404).json({error:'ユーザーが見つかりません'});
+    if(!sameGroup(target,req.user))return res.status(400).json({error:'同じクラスのユーザーだけ追加できます'});
+    talk.removedMemberIds=Array.isArray(talk.removedMemberIds)?talk.removedMemberIds.filter(x=>String(x)!==uid):[];
+    if(!talk.memberIds.includes(target.id))talk.memberIds.push(target.id);
+    save(db);res.json({ok:true});
+  }catch(e){res.status(400).json({error:e.message||'メンバーを追加できません'})}
+});
+app.delete('/api/talks/:room/members/:userId',auth,(req,res)=>{
+  try{
+    const room=String(req.params.room);
+    if(room!=='class')return res.status(400).json({error:'このトークのメンバーは変更できません'});
+    const db=load(),talk=ensureTalk(db,req.user,'class');
+    if(!hasRole(req.user,'CLASS_ADMIN')||!sameGroup(req.user,talk))return res.status(403).json({error:'CLASS ADMIN権限が必要です'});
+    const uid=String(req.params.userId);
+    if(uid===String(req.user.id))return res.status(400).json({error:'自分自身は退会させられません'});
+    const target=db.users.find(u=>String(u.id)===uid);
+    if(!target||!sameGroup(target,req.user))return res.status(404).json({error:'このクラスのメンバーが見つかりません'});
+    talk.memberIds=Array.isArray(talk.memberIds)?talk.memberIds.filter(x=>String(x)!==uid):[];
+    talk.removedMemberIds=Array.isArray(talk.removedMemberIds)?talk.removedMemberIds:[]; 
+    if(!talk.removedMemberIds.includes(target.id))talk.removedMemberIds.push(target.id);
+    save(db);res.json({ok:true});
+  }catch(e){res.status(400).json({error:e.message||'メンバーを退会させられません'})}
+});
 app.get('/api/talks/:room/members',auth,(req,res)=>{
   try{
     const room=String(req.params.room);
