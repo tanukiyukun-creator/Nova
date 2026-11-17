@@ -576,7 +576,12 @@ app.post('/api/class/read',auth,async(req,res)=>{try{
 }catch(e){res.status(500).json({error:'既読更新に失敗しました'});}});
 app.get('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.query.kind||'class';res.json(db.posts.filter(p=>p.kind===kind&&p.schoolId===s.schoolId&&(kind==='school'||p.grade===s.grade)&&(kind!=='class'||p.className===s.className)).slice(0,100))});
 app.post('/api/posts',auth,(req,res)=>{const db=load(),s=scope(req),kind=req.body.kind||'class'; if(!canManage(req.user,kind))return res.status(403).json({error:'権限がありません'});const p={id:id(),...s,kind,title:req.body.title||'',body:req.body.body||'',authorId:req.user.id,createdAt:Date.now()};db.posts.unshift(p);save(db);res.json(p)});
-function canManage(u,kind){if(hasRole(u,'SUPER_ADMIN')||hasRole(u,'SCHOOL_ADMIN'))return true;if(kind==='grade')return hasRole(u,'GRADE_ADMIN');if(kind==='class')return hasRole(u,'CLASS_ADMIN')||hasRole(u,'GRADE_ADMIN');return false}
+function canManage(u,kind){
+  const isAdmin=hasRole(u,'SUPER_ADMIN')||hasRole(u,'SCHOOL_ADMIN')||hasRole(u,'GRADE_ADMIN')||hasRole(u,'CLASS_ADMIN');
+  if(kind==='school'||kind==='grade')return isAdmin;
+  if(kind==='class')return hasRole(u,'CLASS_ADMIN')||hasRole(u,'GRADE_ADMIN')||hasRole(u,'SCHOOL_ADMIN')||hasRole(u,'SUPER_ADMIN');
+  return false;
+}
 app.get('/api/events',auth,(req,res)=>{const db=load(),s=scope(req);res.json(db.events.filter(e=>e.schoolId===s.schoolId&&(e.grade==null||e.grade===s.grade)).sort((a,b)=>a.date.localeCompare(b.date)))});
 app.post('/api/events',auth,(req,res)=>{if(!(hasRole(req.user,'SUPER_ADMIN')||hasRole(req.user,'SCHOOL_ADMIN')))return res.status(403).end();const db=load(),s=scope(req);const e={id:id(),...s,title:req.body.title,date:req.body.date,place:req.body.place||'',body:req.body.body||''};db.events.push(e);db.users.filter(u=>u.schoolId===s.schoolId&&(e.grade==null||u.grade===e.grade)).forEach(u=>notify(db,u.id,'event','学校行事',e.title));save(db);res.json(e)});
 app.get('/api/tasks',auth,(req,res)=>{const db=load(),s=scope(req);if(!Array.isArray(db.taskCompletions))db.taskCompletions=[];res.json(db.tasks.filter(t=>t.schoolId===s.schoolId&&t.grade===s.grade&&t.className===s.className).sort((a,b)=>(a.dueAt||Infinity)-(b.dueAt||Infinity)).map(t=>({...t,completed:db.taskCompletions.some(x=>x.taskId===t.id&&x.userId===req.user.id)})))});
