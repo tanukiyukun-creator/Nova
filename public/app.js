@@ -1234,7 +1234,7 @@ async function createTaskPrompt(){const title=prompt('課題名');if(!title?.tri
 async function editTask(t){const title=prompt('課題名',t.title||'');if(title===null)return;const subject=prompt('教科',t.subject||'');if(subject===null)return;const due=prompt('期限（YYYY-MM-DD、空欄で解除）',t.dueAt?new Date(t.dueAt).toISOString().slice(0,10):'');if(due===null)return;try{await api('/api/tasks/'+t.id,{method:'PATCH',body:JSON.stringify({title,subject,dueAt:due?new Date(due).getTime():null})});scheduleView($('#main'))}catch(e){toast(e.message)}}
 async function deleteTask(id2){if(!confirm('この課題を削除しますか？'))return;try{await api('/api/tasks/'+id2,{method:'DELETE'});scheduleView($('#main'))}catch(e){toast(e.message)}}
 async function toggleTask(id2){try{await api('/api/tasks/'+id2+'/complete',{method:'POST'});scheduleView($('#main'))}catch(e){toast(e.message)}}
-async async function enableNovaPush(){
+async function enableNovaPush(){
   if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))return toast('この端末・ブラウザはプッシュ通知に対応していません');
   try{
     const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
@@ -1253,7 +1253,7 @@ async async function enableNovaPush(){
 async function disableNovaPush(){
   try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(sub){await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})});await sub.unsubscribe()}toast('プッシュ通知を停止しました');settings($('#main'))}catch(e){toast(e?.message||'通知の停止に失敗しました')}
 }
-function settings(m){
+async function settings(m){
   let schoolUsers=[];
   const canSchool=hasClientRole('SCHOOL_ADMIN')||hasClientRole('SUPER_ADMIN');
   if(canSchool){try{schoolUsers=await api('/api/school/users')}catch{}}
