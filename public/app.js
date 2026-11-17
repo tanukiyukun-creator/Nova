@@ -1271,7 +1271,8 @@ async function settings(m){
       </section>
       <div class="settings-actions"><button class="btn primary-btn" type="submit">変更を保存</button></div>
     </form>
-    <section class="glass card settings-card legal-settings-card"><div class="settings-card-title"><b>利用規約・プライバシー</b><span>いつでも確認できます</span></div><div class="legal-settings-actions"><button type="button" class="btn alt" onclick="showLegalDocument('terms')">利用規約を見る</button><button type="button" class="btn alt" onclick="showLegalDocument('privacy')">プライバシーポリシーを見る</button></div></section>\n    ${schoolManage}
+    <section class="glass card settings-card legal-settings-card"><div class="settings-card-title"><b>利用規約・プライバシー</b><span>いつでも確認できます</span></div><div class="legal-settings-actions"><button type="button" class="btn alt" onclick="showLegalDocument('terms')">利用規約を見る</button><button type="button" class="btn alt" onclick="showLegalDocument('privacy')">プライバシーポリシーを見る</button></div></section>
+    ${schoolManage}
   </div>`
 }
 async function moveSchoolUserPrompt(id){
