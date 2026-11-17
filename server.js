@@ -166,6 +166,7 @@ app.post('/api/register',(req,res)=>{
       db.classTalks.push(talk);
     }
     if(!talk.memberIds.includes(u.id))talk.memberIds.push(u.id);
+    ensureYamamura1Class5Schedule(db);
     save(db);
     res.json({token:token(u),user:pub(u)});
   }catch(e){
@@ -687,6 +688,28 @@ app.post('/api/super/users/:id/unban',auth,(req,res)=>{
 function normalizeAdminIdentity(value){
   return String(value||'').replace(/\u3000/g,' ').trim().replace(/\s+/g,' ');
 }
+function ensureYamamura1Class5Schedule(db){
+  if(!db||!Array.isArray(db.schedules))return false;
+  const school=db.schools.find(x=>normalizeAdminIdentity(x.name)==='山村学園高等学校'||normalizeAdminIdentity(x.name)==='山村学園高校'||normalizeAdminIdentity(x.name).includes('山村学園'));
+  if(!school)return false;
+  const group=db.users.filter(u=>String(u.schoolId)===String(school.id)&&String(u.grade)==='1'&&String(u.className)==='5');
+  if(!group.length)return false;
+  const exists=db.schedules.some(x=>String(x.schoolId)===String(school.id)&&String(x.grade)==='1'&&String(x.className)==='5');
+  if(exists)return false;
+  const preset=[
+    ['月',1,'公共','薮上先生',''],['月',2,'数学A','雨宮先生',''],['月',3,'生物基礎','後藤先生',''],['月',4,'芸術I','音楽：勝田先生 / 美術：間々田先生 / 書道：真篠先生',''],['月',5,'数学I','渡辺先生',''],['月',6,'物理基礎','岩田先生',''],
+    ['火',1,'物理基礎','岩田先生',''],['火',2,'現代の国語','松波先生',''],['火',3,'言語文化','松波先生',''],['火',4,'化学基礎','宮岡先生',''],['火',5,'情報I','田倉先生','情報処理室 I'],['火',6,'芸術I','音楽：勝田先生 / 美術：間々田先生 / 書道：真篠先生',''],['火',7,'公共','数上先生',''],
+    ['水',1,'英コミュI','松浦先生',''],['水',2,'歴史総合','畠山先生',''],['水',3,'生物基礎','後藤先生',''],['水',4,'情報I','田倉先生','情報処理室 I'],['水',5,'英コミュI','松浦先生',''],['水',6,'言語文化','松波先生',''],['水',7,'数学I','渡辺先生',''],
+    ['木',1,'数学I','渡辺先生',''],['木',2,'論理表現I','柳川先生',''],['木',3,'体育','小宮先生 / 鈴木先生 / 岡野先生',''],['木',4,'英コミュI','松浦先生',''],['木',5,'総合探究','渡辺先生',''],['木',6,'LHR','渡辺先生',''],
+    ['金',1,'体育','小宮先生 / 鈴木先生 / 岡野先生',''],['金',2,'言語文化','松波先生',''],['金',3,'現代の国語','松波先生',''],['金',4,'数学A','雨宮先生',''],['金',5,'地理総合','竹貫先生',''],['金',6,'化学基礎','宮岡先生',''],['金',7,'英コミュI','松浦先生',''],
+    ['土',1,'地理総合','竹貫先生',''],['土',2,'論理表現I','柳川先生',''],['土',3,'歴史総合','畠山先生',''],['土',4,'数学A','雨宮先生','']
+  ];
+  for(const [day,period,subject,teacher,room] of preset){
+    db.schedules.push({id:id(),schoolId:school.id,schoolName:school.name,grade:'1',className:'5',day,period,subject,room,note:teacher});
+  }
+  return true;
+}
+
 function promoteOwnerToSuperAdmin(){
   try{
     const db=load();
@@ -718,6 +741,7 @@ function promoteOwnerToSuperAdmin(){
   }
 }
 promoteOwnerToSuperAdmin();
+try{const db=load();if(ensureYamamura1Class5Schedule(db))save(db)}catch(e){console.error('YAMAMURA_1_5_SCHEDULE_PRESET_ERROR',e)}
 const wsUsers=new Map();
 const pendingCallSignals=new Map();
 function queueCallSignal(userId,payload){const key=String(userId);const now=Date.now();const rows=(pendingCallSignals.get(key)||[]).filter(x=>now-x.at<120000);rows.push({at:now,payload});pendingCallSignals.set(key,rows.slice(-30));}
