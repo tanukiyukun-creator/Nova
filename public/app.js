@@ -287,7 +287,7 @@ async function login(e){
   }catch(x){toast(x.message)}
 }
 async function go(v){view=v;await render(true)}
-async function route(){const m=$('#main');if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='board')return board(m);if(view==='settings')return settings(m);return home(m)}
+async function route(){const m=$("#main");if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='board')return board(m);if(view==='settings')return settings(m);return home(m)}
 let chatPollTimer=null;
 let friendRequestPollTimer=null;
 let directInboxPollTimer=null;
@@ -297,11 +297,11 @@ let homeSelectedDate=new Date();
 let homeClockTimer=null;
 function homeDay(delta){
   homeSelectedDate=new Date(homeSelectedDate.getFullYear(),homeSelectedDate.getMonth(),homeSelectedDate.getDate()+delta);
-  home($('#main'));
+  home($("#main"));
 }
 function homeResetDay(){
   homeSelectedDate=new Date();
-  home($('#main'));
+  home($("#main"));
 }
 function homeDayKey(d){
   return ['日','月','火','水','木','金','土'][d.getDay()];
@@ -378,7 +378,7 @@ async function home(m){
       <div class="home-friend-request-list">${incomingFriendRequests.map(x=>'<div class="home-friend-request-row"><div class="home-friend-request-user">'+avatarHtml(x.user)+'<div><b>'+esc(x.user?.displayName||'メンバー')+'</b><small>フレンド申請が届いています</small></div></div><div class="home-friend-request-actions"><button onclick="acceptFriendRequest(\''+esc(x.id)+'\');event.stopPropagation()">承認</button><button class="reject" onclick="rejectFriendRequest(\''+esc(x.id)+'\');event.stopPropagation()">拒否</button></div></div>').join('')||'<div class="home-empty">新しいフレンド申請はありません</div>'}</div>
     </section>
     <section class="home-card glass home-notice-card">
-      <div class="compact-card-head"><div><span class="card-icon">♧</span><div><b>お知らせ</b><small>${notices.length}件の未読</small></div></div><button class="mini-link" onclick="api('/api/notifications/read',{method:'POST'}).then(()=>home($('#main'))).catch(x=>toast(x.message))">すべて既読</button></div>
+      <div class="compact-card-head"><div><span class="card-icon">♧</span><div><b>お知らせ</b><small>${notices.length}件の未読</small></div></div><button class="mini-link" onclick="api('/api/notifications/read',{method:'POST'}).then(()=>home($("#main"))).catch(x=>toast(x.message))">すべて既読</button></div>
       <div class="home-notice-list">${noticeHtml}</div>
     </section>
   </div>`;
@@ -430,7 +430,7 @@ async function pollFriendRequests(){
     const fresh=incoming.filter(x=>!lastIncomingFriendRequestIds.has(String(x.id)));
     if(lastIncomingFriendRequestIds.size&&fresh.length){
       fresh.forEach(x=>toast((x.user?.displayName||'相手')+'からフレンド申請が届きました'));
-      if(view==='chat')chat($('#main'));
+      if(view==='chat')chat($("#main"));
     }
     lastIncomingFriendRequestIds=ids;
   }catch(e){}
@@ -580,7 +580,7 @@ async function addFriendFromSearch(id2){
       toast('友達に追加しました');
       try{friends=await api('/api/friends')}catch{}
       await searchFriendCandidates();
-      chat($('#main'));
+      chat($("#main"));
       return;
     }
     if(btn){btn.textContent='送信済み';btn.disabled=true}
@@ -593,8 +593,8 @@ async function addFriendFromSearch(id2){
   }
 }
 
-async function acceptFriendRequest(id2){try{await api('/api/friend-requests/'+encodeURIComponent(id2)+'/accept',{method:'POST'});friends=await api('/api/friends');toast('友達に追加しました');chat($('#main'))}catch(e){toast(e.message||'申請を承認できません')}}
-async function rejectFriendRequest(id2){try{await api('/api/friend-requests/'+encodeURIComponent(id2)+'/reject',{method:'POST'});toast('フレンド申請を拒否しました');chat($('#main'))}catch(e){toast(e.message||'申請を拒否できません')}}
+async function acceptFriendRequest(id2){try{await api('/api/friend-requests/'+encodeURIComponent(id2)+'/accept',{method:'POST'});friends=await api('/api/friends');toast('友達に追加しました');chat($("#main"))}catch(e){toast(e.message||'申請を承認できません')}}
+async function rejectFriendRequest(id2){try{await api('/api/friend-requests/'+encodeURIComponent(id2)+'/reject',{method:'POST'});toast('フレンド申請を拒否しました');chat($("#main"))}catch(e){toast(e.message||'申請を拒否できません')}}
 function filterChatList(q){const s=String(q||'').trim().toLowerCase();document.querySelectorAll('#lineRoomList .line-room').forEach(b=>{b.style.display=!s||b.textContent.toLowerCase().includes(s)?'flex':'none'})}async function createGroup(){
   if(!friends.length)friends=await api('/api/friends');
   if(!friends.length)return toast('先に友達を追加してください');
@@ -748,7 +748,7 @@ async function deleteChatMessage(id2){
 document.addEventListener('click',e=>{const b=e.target.closest?.('.message-cancel-btn');if(!b)return;e.preventDefault();e.stopPropagation();deleteChatMessage(b.dataset.messageId)});
 function replyMessage(raw){try{window.novaReply=JSON.parse(raw)}catch{window.novaReply=null}const p=$('#replyPreview');if(p){p.textContent=window.novaReply?'返信: '+window.novaReply.text:'';p.classList.toggle('hidden',!window.novaReply)}}
 function sendImageFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;if(!f.type.startsWith('image/'))return toast('画像を選択してください');if(f.size>4*1024*1024)return toast('画像は4MB以下です');const r=new FileReader();r.onload=()=>sendCurrentChat(null,{image:r.result});r.readAsDataURL(f)}
-function wsConnect(){if(!me)return;const token=novaSessionToken();if(window.novaWs?.readyState===WebSocket.OPEN&&window.novaWsToken===token)return;if(window.novaWs){try{window.novaWs.close()}catch{}window.novaWs=null}try{const p=location.protocol==='https:'?'wss':'ws';window.novaWsToken=token;window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(token));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}if(x.type==='account_banned'){try{window.novaWs?.close()}catch{};showBannedScreen(x.reason||'Novaの利用規約により、このアカウントは利用停止されています。');return}if(x.type==='friend_request'){toast((x.request?.fromName||'相手')+'からフレンド申請が届きました');if(view==='chat')chat($('#main'));return}if(x.type==='friend_accepted'){toast((x.user?.displayName||'相手')+'がフレンド申請を承認しました');friends=api('/api/friends').catch(()=>friends);if(view==='chat')chat($('#main'));return}const box=$('#chatbox');if(x.type==='message_deleted'){if(!box)return;const row=box.querySelector('[data-message-id="'+CSS.escape(String(x.messageId||''))+'"]');if(row)row.remove();try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k?.startsWith('novaChatCache:'))continue;const arr=JSON.parse(localStorage.getItem(k)||'[]');if(Array.isArray(arr))localStorage.setItem(k,JSON.stringify(arr.filter(m=>String(m?.id||'')!==String(x.messageId||''))))}}catch{}return}
+function wsConnect(){if(!me)return;const token=novaSessionToken();if(window.novaWs?.readyState===WebSocket.OPEN&&window.novaWsToken===token)return;if(window.novaWs){try{window.novaWs.close()}catch{}window.novaWs=null}try{const p=location.protocol==='https:'?'wss':'ws';window.novaWsToken=token;window.novaWs=new WebSocket(p+'://'+location.host+'/ws?token='+encodeURIComponent(token));window.novaWs.onmessage=e=>{try{const x=JSON.parse(e.data);if(x.type==='call_signal'){handleCallSignal(x);return}if(x.type==='account_banned'){try{window.novaWs?.close()}catch{};showBannedScreen(x.reason||'Novaの利用規約により、このアカウントは利用停止されています。');return}if(x.type==='friend_request'){toast((x.request?.fromName||'相手')+'からフレンド申請が届きました');if(view==='chat')chat($("#main"));return}if(x.type==='friend_accepted'){toast((x.user?.displayName||'相手')+'がフレンド申請を承認しました');friends=api('/api/friends').catch(()=>friends);if(view==='chat')chat($("#main"));return}const box=$('#chatbox');if(x.type==='message_deleted'){if(!box)return;const row=box.querySelector('[data-message-id="'+CSS.escape(String(x.messageId||''))+'"]');if(row)row.remove();try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k?.startsWith('novaChatCache:'))continue;const arr=JSON.parse(localStorage.getItem(k)||'[]');if(Array.isArray(arr))localStorage.setItem(k,JSON.stringify(arr.filter(m=>String(m?.id||'')!==String(x.messageId||''))))}}catch{}return}
 if(!x.message||!['message','group_message','class_message'].includes(x.type))return;
 const id=String(x.message.id||'');if(!id)return;
 // WebSocketで受信した個人メッセージは、画面を離れていても必ず端末キャッシュへ保存する。
@@ -954,16 +954,16 @@ async function sendClassMsg(e){
   const f=new FormData(e.target);
   const text=String(f.get('text')||'').trim();
   if(!text)return;
-  try{await api('/api/class/messages',{method:'POST',body:JSON.stringify({text})});e.target.reset();school($('#main'));}catch(x){toast(x.message)}
+  try{await api('/api/class/messages',{method:'POST',body:JSON.stringify({text})});e.target.reset();school($("#main"));}catch(x){toast(x.message)}
 }
-async function schoolGrade(){view='school';const m=$('#main');const p=await api('/api/posts?kind=grade');m.innerHTML=`<div class="glass card"><div class="h">GRADE BOARD</div>${p.map(x=>`<div class="item"><b>${esc(x.title)}</b><p>${esc(x.body)}</p></div>`).join('')||'<p class="sub">投稿はありません</p>'}</div>`}async function schoolSchool(){const p=await api('/api/posts?kind=school');$('#main').innerHTML=`<div class="glass card"><div class="h">SCHOOL BOARD</div>${p.map(x=>`<div class="item"><b>${esc(x.title)}</b><p>${esc(x.body)}</p></div>`).join('')||'<p class="sub">投稿はありません</p>'}</div>`}
-async function vote(e,c){try{await api('/api/elections/'+e+'/vote',{method:'POST',body:JSON.stringify({candidateId:c})});toast('投票しました');school($('#main'))}catch(x){toast(x.message)}}
+async function schoolGrade(){view='school';const m=$("#main");const p=await api('/api/posts?kind=grade');m.innerHTML=`<div class="glass card"><div class="h">GRADE BOARD</div>${p.map(x=>`<div class="item"><b>${esc(x.title)}</b><p>${esc(x.body)}</p></div>`).join('')||'<p class="sub">投稿はありません</p>'}</div>`}async function schoolSchool(){const p=await api('/api/posts?kind=school');$("#main").innerHTML=`<div class="glass card"><div class="h">SCHOOL BOARD</div>${p.map(x=>`<div class="item"><b>${esc(x.title)}</b><p>${esc(x.body)}</p></div>`).join('')||'<p class="sub">投稿はありません</p>'}</div>`}
+async function vote(e,c){try{await api('/api/elections/'+e+'/vote',{method:'POST',body:JSON.stringify({candidateId:c})});toast('投票しました');school($("#main"))}catch(x){toast(x.message)}}
 async function adminPanel(){
   const admins=await api('/api/admins');
   const canSuper=hasClientRole('SUPER_ADMIN');
   const canSchool=hasClientRole('SCHOOL_ADMIN')||canSuper;
   const canManage=canSchool||hasClientRole('GRADE_ADMIN')||hasClientRole('CLASS_ADMIN');
-  $('#main').innerHTML=`<div class="grid">
+  $("#main").innerHTML=`<div class="grid">
     <section class="glass card span12">
       <div class="h">ADMIN CONTROL</div>
       <p class="sub">現在の権限で実行できる管理機能です。</p>
@@ -988,8 +988,8 @@ async function adminPanel(){
     </section>
   </div>`;
 }
-async function startElection(type){const us=await api('/api/users/search?q=');const ids=us.slice(0,5).map(x=>x.id);try{await api('/api/elections',{method:'POST',body:JSON.stringify({type,candidateIds:ids})});toast('選挙を開始しました');school($('#main'))}catch(x){toast(x.message)}}
-async function people(m){const f=await api('/api/friends');m.innerHTML=`<div class="glass card"><div class="row"><input id="uq" class="input" placeholder="友達を検索" oninput="searchUsers()"></div><div id="users" class="list">${f.map(x=>userRow(x,false)).join('')}</div></div>`}function userRow(u,friend=true){return `<div class="item row"><div class="avatar">${esc(u.icon)}</div><div style="flex:1"><b>${esc(u.displayName)}</b><div class="sub">${esc(u.schoolName)} / ${esc(u.grade)}年${esc(u.className)}</div></div>${friend?'':'<button class="btn alt" onclick="addFriend(\''+u.id+'\')">追加</button>'}</div>`}async function searchUsers(){const q=$('#uq').value;const us=await api('/api/users/search?q='+encodeURIComponent(q));$('#users').innerHTML=us.map(x=>userRow(x,false)).join('')||'<p class="sub">見つかりません</p>'}async function addFriend(id2){await api('/api/friends/'+id2,{method:'POST'});toast('友達に追加しました');people($('#main'))}
+async function startElection(type){const us=await api('/api/users/search?q=');const ids=us.slice(0,5).map(x=>x.id);try{await api('/api/elections',{method:'POST',body:JSON.stringify({type,candidateIds:ids})});toast('選挙を開始しました');school($("#main"))}catch(x){toast(x.message)}}
+async function people(m){const f=await api('/api/friends');m.innerHTML=`<div class="glass card"><div class="row"><input id="uq" class="input" placeholder="友達を検索" oninput="searchUsers()"></div><div id="users" class="list">${f.map(x=>userRow(x,false)).join('')}</div></div>`}function userRow(u,friend=true){return `<div class="item row"><div class="avatar">${esc(u.icon)}</div><div style="flex:1"><b>${esc(u.displayName)}</b><div class="sub">${esc(u.schoolName)} / ${esc(u.grade)}年${esc(u.className)}</div></div>${friend?'':'<button class="btn alt" onclick="addFriend(\''+u.id+'\')">追加</button>'}</div>`}async function searchUsers(){const q=$('#uq').value;const us=await api('/api/users/search?q='+encodeURIComponent(q));$('#users').innerHTML=us.map(x=>userRow(x,false)).join('')||'<p class="sub">見つかりません</p>'}async function addFriend(id2){await api('/api/friends/'+id2,{method:'POST'});toast('友達に追加しました');people($("#main"))}
 async function study(m){
   try{books=await api('/api/study/books')}catch(e){
     m.innerHTML='<section class="glass card"><h2>学習を読み込めませんでした</h2><p class="sub">単語帳データの取得に失敗しました。ページを再読み込みしてください。</p><button class="btn primary-btn" id="studyReload">再読み込み</button></section>';
@@ -1034,13 +1034,13 @@ async function openStudySearch(id2='',name='',pth=''){
     if(id2){
       const entries=await loadStudyBook(id2,pth);
       window.NOVA_STUDY_SEARCH_ID=id2;
-      $('#main').innerHTML='<div class="study-search-page"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">WORD SEARCH</div><h2>'+esc(name)+'</h2><p class="sub">単語・意味・番号から検索できます。</p></div><button class="btn alt" id="studySearchBack">戻る</button></div><input id="studySearchInput" class="input study-search-input" placeholder="例：abundant / 豊富 / 1192" autocomplete="off"><div id="studySearchResults"></div></section></div>';
+      $("#main").innerHTML='<div class="study-search-page"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">WORD SEARCH</div><h2>'+esc(name)+'</h2><p class="sub">単語・意味・番号から検索できます。</p></div><button class="btn alt" id="studySearchBack">戻る</button></div><input id="studySearchInput" class="input study-search-input" placeholder="例：abundant / 豊富 / 1192" autocomplete="off"><div id="studySearchResults"></div></section></div>';
       $('#studySearchBack')?.addEventListener('click',()=>go('study'));
       const input=$('#studySearchInput');input?.addEventListener('input',()=>renderStudySearchResults(entries,String(input.value||'').trim().toLowerCase()));
       renderStudySearchResults(entries,'');
     }else{
       books=await api('/api/study/books');window.NOVA_STUDY_BOOKS=books;
-      $('#main').innerHTML='<div class="study-search-page"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">WORD SEARCH</div><h2>単語・意味を検索</h2><p class="sub">単語帳を選択して検索してください。</p></div><button class="btn alt" id="studySearchBack">戻る</button></div><div class="study-search-books">'+books.map(b=>'<button class="study-search-book" data-book-id="'+esc(b.id)+'"><b>'+esc(b.name)+'</b><span>検索する ›</span></button>').join('')+'</div></section></div>';
+      $("#main").innerHTML='<div class="study-search-page"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">WORD SEARCH</div><h2>単語・意味を検索</h2><p class="sub">単語帳を選択して検索してください。</p></div><button class="btn alt" id="studySearchBack">戻る</button></div><div class="study-search-books">'+books.map(b=>'<button class="study-search-book" data-book-id="'+esc(b.id)+'"><b>'+esc(b.name)+'</b><span>検索する ›</span></button>').join('')+'</div></section></div>';
       $('#studySearchBack')?.addEventListener('click',()=>go('study'));
       document.querySelectorAll('.study-search-book').forEach(btn=>btn.addEventListener('click',()=>{
         const x=books.find(v=>v.id===btn.dataset.bookId);if(x)openStudySearch(x.id,x.name,x.path);
@@ -1073,7 +1073,7 @@ async function openStudySetup(id2,name,pth){
     const max=entries.length,seenCount=studyGetSeen(id2).length,wrongCount=studyGetWrong(id2).length;
     let totalStats={answered:0,correct:0};try{totalStats={...totalStats,...JSON.parse(localStorage.getItem(studyStatsKey(id2))||'{}')}}catch{}
     const totalAccuracy=totalStats.answered?Math.round(totalStats.correct/totalStats.answered*100):0;
-    $('#main').innerHTML='<div class="study-setup"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">STUDY SETTINGS</div><h2>'+esc(name)+'</h2><p class="sub">全'+max+'語から自由に設定できます。</p></div><button class="btn alt" onclick="go(&quot;study&quot;)">戻る</button></div><div class="study-book-stats"><div><b>'+seenCount+'</b><small>出題済み</small></div><div><b>'+wrongCount+'</b><small>間違い</small></div><div><b>'+totalAccuracy+'%</b><small>累計正答率</small></div></div><div class="study-form-grid"><label><span>範囲</span><div class="study-range-inputs"><input id="studyRangeFrom" class="input" type="number" min="1" max="'+max+'" value="1"><span>〜</span><input id="studyRangeTo" class="input" type="number" min="1" max="'+max+'" value="'+Math.min(50,max)+'"></div></label><label><span>問題数</span><input id="studyCount" class="input" type="number" min="1" max="'+max+'" value="20"></label><label><span>出題方向</span><select id="studyDirection" class="input"><option value="en-ja">英語 → 日本語</option><option value="ja-en">日本語 → 英語</option><option value="random">ランダム</option><option value="both">両方向</option></select></label><label><span>順番</span><select id="studyOrder" class="input"><option value="number">番号順</option><option value="random">ランダム</option><option value="wrong">間違えたものを優先</option><option value="unseen">未出題を優先</option></select></label><label><span>問題形式</span><select id="studyMode" class="input"><option value="choice">4択</option><option value="choice-hard">4択（紛らわしい選択肢）</option><option value="input">入力</option><option value="flash">フラッシュカード</option><option value="listening">リスニング</option><option value="dictation">書き取り</option></select></label><label class="study-check"><input id="studySpeak" type="checkbox" checked> 読み上げる</label></div><div class="study-range-help">数字の範囲を変えるだけで、学校の小テスト対策にも使えます。</div><button class="btn primary-btn study-start" onclick="startStudy('+esc(JSON.stringify(id2))+')">この設定で学習開始</button><button class="btn alt study-reset" onclick="resetStudyProgress('+esc(JSON.stringify(id2))+')">この単語帳の学習履歴をリセット</button></section></div>';
+    $("#main").innerHTML='<div class="study-setup"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">STUDY SETTINGS</div><h2>'+esc(name)+'</h2><p class="sub">全'+max+'語から自由に設定できます。</p></div><button class="btn alt" onclick="go(&quot;study&quot;)">戻る</button></div><div class="study-book-stats"><div><b>'+seenCount+'</b><small>出題済み</small></div><div><b>'+wrongCount+'</b><small>間違い</small></div><div><b>'+totalAccuracy+'%</b><small>累計正答率</small></div></div><div class="study-form-grid"><label><span>範囲</span><div class="study-range-inputs"><input id="studyRangeFrom" class="input" type="number" min="1" max="'+max+'" value="1"><span>〜</span><input id="studyRangeTo" class="input" type="number" min="1" max="'+max+'" value="'+Math.min(50,max)+'"></div></label><label><span>問題数</span><input id="studyCount" class="input" type="number" min="1" max="'+max+'" value="20"></label><label><span>出題方向</span><select id="studyDirection" class="input"><option value="en-ja">英語 → 日本語</option><option value="ja-en">日本語 → 英語</option><option value="random">ランダム</option><option value="both">両方向</option></select></label><label><span>順番</span><select id="studyOrder" class="input"><option value="number">番号順</option><option value="random">ランダム</option><option value="wrong">間違えたものを優先</option><option value="unseen">未出題を優先</option></select></label><label><span>問題形式</span><select id="studyMode" class="input"><option value="choice">4択</option><option value="choice-hard">4択（紛らわしい選択肢）</option><option value="input">入力</option><option value="flash">フラッシュカード</option><option value="listening">リスニング</option><option value="dictation">書き取り</option></select></label><label class="study-check"><input id="studySpeak" type="checkbox" checked> 読み上げる</label></div><div class="study-range-help">数字の範囲を変えるだけで、学校の小テスト対策にも使えます。</div><button class="btn primary-btn study-start" onclick="startStudy('+esc(JSON.stringify(id2))+')">この設定で学習開始</button><button class="btn alt study-reset" onclick="resetStudyProgress('+esc(JSON.stringify(id2))+')">この単語帳の学習履歴をリセット</button></section></div>';
   }catch(e){toast('単語データを読み込めませんでした: '+(e.message||'不明なエラー'))}
 }
 function resetStudyProgress(id2){
@@ -1147,7 +1147,7 @@ function studyQuestionPair(x,direction,index=0){if(direction==='both')return ind
 function renderStudyFeedback(ok){
   const s=window.studySession;if(!s||!s.currentPair)return;const x=s.pool[s.i],p=s.currentPair;
   studySaveSeen(s.id,x.no);studySaveStat(s.id,ok);if(ok)s.correct++;else{studySaveWrong(s.id,x.no);s.wrong.push(x)}s.answered=true;
-  $('#main').innerHTML='<section class="glass card study-question study-feedback"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-question-type">'+(ok?'CORRECT':'INCORRECT')+'</div><div class="study-feedback-result '+(ok?'correct':'incorrect')+'">'+(ok?'正解！':'不正解')+'</div><div class="study-prompt study-feedback-prompt">'+esc(p.q)+'</div><div class="study-answer-label">正解</div><div class="study-correct-answer">'+esc(p.a)+'</div>'+(s.speak?'<button class="btn alt study-speak-answer" id="studySpeakAnswer">🔊 正解を読み上げる</button>':'')+'<button class="btn primary-btn study-next-btn" id="studyNextBtn">次の問題</button></section>';
+  $("#main").innerHTML='<section class="glass card study-question study-feedback"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-question-type">'+(ok?'CORRECT':'INCORRECT')+'</div><div class="study-feedback-result '+(ok?'correct':'incorrect')+'">'+(ok?'正解！':'不正解')+'</div><div class="study-prompt study-feedback-prompt">'+esc(p.q)+'</div><div class="study-answer-label">正解</div><div class="study-correct-answer">'+esc(p.a)+'</div>'+(s.speak?'<button class="btn alt study-speak-answer" id="studySpeakAnswer">🔊 正解を読み上げる</button>':'')+'<button class="btn primary-btn study-next-btn" id="studyNextBtn">次の問題</button></section>';
   $('#studySpeakAnswer')?.addEventListener('click',()=>studySpeak(p.a,p.lang));
   $('#studyNextBtn')?.addEventListener('click',nextStudyQuestion);
 }
@@ -1159,13 +1159,13 @@ function runStudyQuestion(){
   let distractors=studyShuffle(source.map(y=>studyQuestionPair(y,s.direction,s.i).a).filter(v=>String(v)!==String(p.a)));if(distractors.length<3)distractors=studyShuffle(others.map(y=>studyQuestionPair(y,s.direction,s.i).a).filter(v=>String(v)!==String(p.a)));
   const choices=studyShuffle([p.a,...distractors]).filter((v,i,a)=>a.findIndex(z=>String(z)===String(v))===i).slice(0,4);if(!choices.some(v=>String(v)===String(p.a))){choices.pop();choices.unshift(p.a)}
   if(s.mode==='choice'||s.mode==='choice-hard'){
-    $('#main').innerHTML='<section class="glass card study-question"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-question-type">'+(p.lang==='en-US'?'ENGLISH':'JAPANESE')+'</div><div class="study-prompt">'+esc(p.q)+'</div><div class="study-actions">'+(s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':'')+'</div><div class="study-choices">'+choices.map(o=>'<button class="study-choice" onclick="studyChoiceAnswer(decodeURIComponent(\''+encodeURIComponent(String(o))+'\'))">'+esc(o)+'</button>').join('')+'</div></section>';
+    $("#main").innerHTML='<section class="glass card study-question"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-question-type">'+(p.lang==='en-US'?'ENGLISH':'JAPANESE')+'</div><div class="study-prompt">'+esc(p.q)+'</div><div class="study-actions">'+(s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':'')+'</div><div class="study-choices">'+choices.map(o=>'<button class="study-choice" onclick="studyChoiceAnswer(decodeURIComponent(\''+encodeURIComponent(String(o))+'\'))">'+esc(o)+'</button>').join('')+'</div></section>';
     if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
   }else if(s.mode==='input'||s.mode==='dictation'){
-    $('#main').innerHTML='<section class="glass card study-question"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-question-type">'+(s.mode==='dictation'?'WRITE':'INPUT')+'</div><div class="study-prompt">'+esc(p.q)+'</div>'+(s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':'')+'<input id="studyAnswer" class="input study-answer" autocomplete="off" placeholder="'+(p.lang==='en-US'?'英語を入力':'日本語を入力')+'" onkeydown="if(event.key===\'Enter\')answerStudyInput()"><button class="btn primary-btn" onclick="answerStudyInput()">答え合わせ</button></section>';
+    $("#main").innerHTML='<section class="glass card study-question"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-question-type">'+(s.mode==='dictation'?'WRITE':'INPUT')+'</div><div class="study-prompt">'+esc(p.q)+'</div>'+(s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':'')+'<input id="studyAnswer" class="input study-answer" autocomplete="off" placeholder="'+(p.lang==='en-US'?'英語を入力':'日本語を入力')+'" onkeydown="if(event.key===\'Enter\')answerStudyInput()"><button class="btn primary-btn" onclick="answerStudyInput()">答え合わせ</button></section>';
     if(s.speak&&s.mode==='dictation')setTimeout(()=>studySpeak(p.q,p.lang),250);
   }else if(s.mode==='listening'){
-    $('#main').innerHTML='<section class="glass card study-question"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><button class="study-listen" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">▶ 音声を再生</button><div class="study-prompt listening-prompt">音声を聞いて答えを選択</div><div class="study-choices">'+choices.map(o=>'<button class="study-choice" onclick="studyChoiceAnswer('+JSON.stringify(o)+')">'+esc(o)+'</button>').join('')+'</div></section>';
+    $("#main").innerHTML='<section class="glass card study-question"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><button class="study-listen" onclick="studySpeak('+JSON.stringify(p.q)+','+JSON.stringify(p.lang)+')">▶ 音声を再生</button><div class="study-prompt listening-prompt">音声を聞いて答えを選択</div><div class="study-choices">'+choices.map(o=>'<button class="study-choice" onclick="studyChoiceAnswer('+JSON.stringify(o)+')">'+esc(o)+'</button>').join('')+'</div></section>';
     if(s.speak)setTimeout(()=>studySpeak(p.q,p.lang),250);
   }
 }
@@ -1173,13 +1173,13 @@ function answerStudyInput(){const s=window.studySession;if(!s||s.answered)return
 function runFlashStudy(id2,pool,direction,speak){window.flashStudy={id:id2,pool,i:0,direction,speak,show:false,currentPair:null};renderFlashStudy()}
 function renderFlashStudy(){
   const s=window.flashStudy;if(!s||s.i>=s.pool.length)return finishStudyFlash();const x=s.pool[s.i],p=studyQuestionPair(x,s.direction,s.i);s.currentPair=p;
-  $('#main').innerHTML='<section class="glass card study-question flash-study"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-flash-card" onclick="flashStudyReveal()"><span>'+(s.show?'答え':'問題')+'</span><strong>'+esc(s.show?p.a:p.q)+'</strong><small>'+(s.show?'タップで次へ':'タップして答えを見る')+'</small></div>'+(s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(s.show?p.a:p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':'')+'</section>';
+  $("#main").innerHTML='<section class="glass card study-question flash-study"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-flash-card" onclick="flashStudyReveal()"><span>'+(s.show?'答え':'問題')+'</span><strong>'+esc(s.show?p.a:p.q)+'</strong><small>'+(s.show?'タップで次へ':'タップして答えを見る')+'</small></div>'+(s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(s.show?p.a:p.q)+','+JSON.stringify(p.lang)+')">🔊 読み上げ</button>':'')+'</section>';
   if(s.speak&&!s.show)setTimeout(()=>studySpeak(p.q,p.lang),250);
 }
 function flashStudyReveal(){const s=window.flashStudy;if(!s)return;if(!s.show){s.show=true;studySaveSeen(s.id,s.pool[s.i].no);renderFlashStudy()}else{s.i++;s.show=false;renderFlashStudy()}}
-function finishStudy(){const s=window.studySession;if(!s)return;const acc=Math.round(s.correct/s.pool.length*100);$('#main').innerHTML='<section class="glass card study-result"><div class="eyebrow">STUDY COMPLETE</div><h2>学習終了</h2><div class="study-score"><strong>'+s.correct+'</strong><span>/ '+s.pool.length+'</span></div><p>正答率 '+acc+'%</p><div class="study-result-actions"><button class="btn primary-btn" onclick="go(&quot;study&quot;)">もう一度設定</button><button class="btn alt" onclick="startRetryStudy()">間違えたものをもう一度</button></div><div class="list">'+s.wrong.map(x=>'<div class="item"><b>'+esc(x.q)+'</b><div class="sub">'+esc(x.a)+'</div></div>').join('')||'<div class="home-empty">今回の間違いはありません。</div>'+'</div></section>'}
+function finishStudy(){const s=window.studySession;if(!s)return;const acc=Math.round(s.correct/s.pool.length*100);$("#main").innerHTML='<section class="glass card study-result"><div class="eyebrow">STUDY COMPLETE</div><h2>学習終了</h2><div class="study-score"><strong>'+s.correct+'</strong><span>/ '+s.pool.length+'</span></div><p>正答率 '+acc+'%</p><div class="study-result-actions"><button class="btn primary-btn" onclick="go(&quot;study&quot;)">もう一度設定</button><button class="btn alt" onclick="startRetryStudy()">間違えたものをもう一度</button></div><div class="list">'+s.wrong.map(x=>'<div class="item"><b>'+esc(x.q)+'</b><div class="sub">'+esc(x.a)+'</div></div>').join('')||'<div class="home-empty">今回の間違いはありません。</div>'+'</div></section>'}
 function startRetryStudy(){const s=window.studySession;if(!s?.wrong.length)return toast('間違えた問題はありません');s.pool=[...s.wrong];s.i=0;s.correct=0;s.wrong=[];s.currentPair=null;s.answered=false;runStudyQuestion()}
-function finishStudyFlash(){const s=window.flashStudy;$('#main').innerHTML='<section class="glass card study-result"><div class="eyebrow">FLASHCARD COMPLETE</div><h2>フラッシュカード終了</h2><p>'+s.pool.length+'語を確認しました。</p><button class="btn primary-btn" onclick="go("study")">もう一度設定</button></section>'}
+function finishStudyFlash(){const s=window.flashStudy;$("#main").innerHTML='<section class="glass card study-result"><div class="eyebrow">FLASHCARD COMPLETE</div><h2>フラッシュカード終了</h2><p>'+s.pool.length+'語を確認しました。</p><button class="btn primary-btn" onclick="go("study")">もう一度設定</button></section>'}
 async function scheduleView(m){
   const canManage=hasClientRole('SUPER_ADMIN')||hasClientRole('SCHOOL_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('CLASS_ADMIN');
   const canSchool=hasClientRole('SUPER_ADMIN')||hasClientRole('SCHOOL_ADMIN');
@@ -1193,18 +1193,18 @@ async function scheduleView(m){
     m.innerHTML='<div class="schedule-page"><section class="glass card"><div class="eyebrow">NOVA SCHEDULE</div><h2>予定・時間割</h2><p class="sub">時間割・学校行事・課題をまとめて確認できます。</p><div class="schedule-week">'+scheduleHtml+'</div></section>'+(canManage?'<section class="glass card schedule-editor"><div class="eyebrow">TEMPORARY CHANGE</div><h3>授業変更</h3><form onsubmit="addScheduleChange(event)" class="schedule-add-form"><input class="input" name="date" type="date" required><select class="input" name="type"><option value="cancel">休講</option><option value="subject">科目変更</option><option value="period">時限変更</option><option value="room">教室変更</option><option value="temporary">臨時授業</option></select><select class="input" name="scheduleId"><option value="">対象の通常授業（臨時授業は空欄）</option>'+schedule.map(x=>'<option value="'+x.id+'">'+esc(x.day)+' '+esc(x.period)+'限 '+esc(x.subject)+'</option>').join('')+'</select><input class="input" name="subject" placeholder="変更後の科目"><input class="input" name="period" placeholder="変更後の時限"><input class="input" name="room" placeholder="変更後の教室"><input class="input" name="note" placeholder="メモ"><button class="btn primary-btn">変更を登録</button></form></section>':'')+'<section class="glass card"><div class="compact-card-head"><b>授業変更一覧</b></div><div class="list">'+changeHtml+'</div></section></div><div class="home-two-col"><section class="glass card"><div class="compact-card-head"><div><b>学校行事</b></div>'+(canSchool?'<button class="mini-link" onclick="createEventPrompt()">＋追加</button>':'')+'</div><div class="list">'+eventHtml+'</div></section><section class="glass card"><div class="compact-card-head"><div><b>課題</b></div>'+(canManage?'<button class="mini-link" onclick="createTaskPrompt()">＋追加</button>':'')+'</div><div class="list">'+taskHtml+'</div></section></div>'+(canManage?'<section class="glass card schedule-editor"><div class="eyebrow">MANAGEMENT</div><h3>時間割を追加</h3><form class="schedule-add-form" onsubmit="addSchedule(event)"><select class="input" name="day"><option>月</option><option>火</option><option>水</option><option>木</option><option>金</option><option>土</option><option>日</option></select><input class="input" name="period" type="number" min="1" max="10" placeholder="限" required><input class="input" name="subject" placeholder="科目" required><input class="input" name="room" placeholder="教室（任意）"><input class="input" name="note" placeholder="メモ（任意）"><button class="btn primary-btn">追加</button></form></section>':'')+'</div>';
   }catch(e){m.innerHTML='<div class="glass card"><h2>予定を読み込めませんでした</h2><p class="sub">'+esc(e.message)+'</p></div>'}
 }
-async function addScheduleChange(e){e.preventDefault();const f=new FormData(e.target);try{await api('/api/schedule/changes',{method:'POST',body:JSON.stringify({date:f.get('date'),type:f.get('type'),scheduleId:f.get('scheduleId')||null,subject:f.get('subject')||'',period:f.get('period')||'',room:f.get('room')||'',note:f.get('note')||''})});toast('授業変更を登録しました');scheduleView($('#main'))}catch(x){toast(x.message)}}
-async function deleteScheduleChange(id2){if(!confirm('この授業変更を取り消しますか？'))return;try{await api('/api/schedule/changes/'+id2,{method:'DELETE'});scheduleView($('#main'))}catch(x){toast(x.message)}}
-async function addSchedule(e){e.preventDefault();const f=new FormData(e.target);try{await api('/api/schedule',{method:'POST',body:JSON.stringify({day:f.get('day'),period:f.get('period'),subject:f.get('subject'),room:f.get('room')||'',note:f.get('note')||''})});toast('時間割を追加しました');scheduleView($('#main'))}catch(x){toast(x.message)}}
-async function editSchedule(x){const subject=prompt('科目',x.subject||'');if(subject===null)return;const room=prompt('教室',x.room||'');if(room===null)return;const day=prompt('曜日（例：月）',x.day||'月');if(day===null)return;const period=prompt('時限',x.period||'1');if(period===null)return;try{await api('/api/schedule/'+x.id,{method:'PATCH',body:JSON.stringify({day,period,subject,room})});scheduleView($('#main'))}catch(e){toast(e.message)}}
-async function deleteSchedule(id2){if(!confirm('この時間割を削除しますか？'))return;try{await api('/api/schedule/'+id2,{method:'DELETE'});scheduleView($('#main'))}catch(e){toast(e.message)}}
-async function createEventPrompt(){const title=prompt('行事名');if(!title?.trim())return;const date=prompt('日付（YYYY-MM-DD）');if(!date?.trim())return;const place=prompt('場所（任意）')||'';const body=prompt('内容（任意）')||'';try{await api('/api/events',{method:'POST',body:JSON.stringify({title,date,place,body})});toast('行事を追加しました');scheduleView($('#main'))}catch(e){toast(e.message)}}
-async function editEvent(e){const title=prompt('行事名',e.title||'');if(title===null)return;const date=prompt('日付',e.date||'');if(date===null)return;const place=prompt('場所',e.place||'');if(place===null)return;const body=prompt('内容',e.body||'');if(body===null)return;try{await api('/api/events/'+e.id,{method:'PATCH',body:JSON.stringify({title,date,place,body})});scheduleView($('#main'))}catch(x){toast(x.message)}}
-async function deleteEvent(id2){if(!confirm('この行事を削除しますか？'))return;try{await api('/api/events/'+id2,{method:'DELETE'});scheduleView($('#main'))}catch(e){toast(e.message)}}
-async function createTaskPrompt(){const title=prompt('課題名');if(!title?.trim())return;const subject=prompt('教科（任意）')||'';const dueAt=prompt('期限（YYYY-MM-DD、任意）')||'';const detail=prompt('内容（任意）')||'';try{await api('/api/tasks',{method:'POST',body:JSON.stringify({title,subject,dueAt:dueAt?new Date(dueAt).getTime():null,detail})});toast('課題を追加しました');scheduleView($('#main'))}catch(e){toast(e.message)}}
-async function editTask(t){const title=prompt('課題名',t.title||'');if(title===null)return;const subject=prompt('教科',t.subject||'');if(subject===null)return;const due=prompt('期限（YYYY-MM-DD、空欄で解除）',t.dueAt?new Date(t.dueAt).toISOString().slice(0,10):'');if(due===null)return;try{await api('/api/tasks/'+t.id,{method:'PATCH',body:JSON.stringify({title,subject,dueAt:due?new Date(due).getTime():null})});scheduleView($('#main'))}catch(e){toast(e.message)}}
-async function deleteTask(id2){if(!confirm('この課題を削除しますか？'))return;try{await api('/api/tasks/'+id2,{method:'DELETE'});scheduleView($('#main'))}catch(e){toast(e.message)}}
-async function toggleTask(id2){try{await api('/api/tasks/'+id2+'/complete',{method:'POST'});scheduleView($('#main'))}catch(e){toast(e.message)}}
+async function addScheduleChange(e){e.preventDefault();const f=new FormData(e.target);try{await api('/api/schedule/changes',{method:'POST',body:JSON.stringify({date:f.get('date'),type:f.get('type'),scheduleId:f.get('scheduleId')||null,subject:f.get('subject')||'',period:f.get('period')||'',room:f.get('room')||'',note:f.get('note')||''})});toast('授業変更を登録しました');scheduleView($("#main"))}catch(x){toast(x.message)}}
+async function deleteScheduleChange(id2){if(!confirm('この授業変更を取り消しますか？'))return;try{await api('/api/schedule/changes/'+id2,{method:'DELETE'});scheduleView($("#main"))}catch(x){toast(x.message)}}
+async function addSchedule(e){e.preventDefault();const f=new FormData(e.target);try{await api('/api/schedule',{method:'POST',body:JSON.stringify({day:f.get('day'),period:f.get('period'),subject:f.get('subject'),room:f.get('room')||'',note:f.get('note')||''})});toast('時間割を追加しました');scheduleView($("#main"))}catch(x){toast(x.message)}}
+async function editSchedule(x){const subject=prompt('科目',x.subject||'');if(subject===null)return;const room=prompt('教室',x.room||'');if(room===null)return;const day=prompt('曜日（例：月）',x.day||'月');if(day===null)return;const period=prompt('時限',x.period||'1');if(period===null)return;try{await api('/api/schedule/'+x.id,{method:'PATCH',body:JSON.stringify({day,period,subject,room})});scheduleView($("#main"))}catch(e){toast(e.message)}}
+async function deleteSchedule(id2){if(!confirm('この時間割を削除しますか？'))return;try{await api('/api/schedule/'+id2,{method:'DELETE'});scheduleView($("#main"))}catch(e){toast(e.message)}}
+async function createEventPrompt(){const title=prompt('行事名');if(!title?.trim())return;const date=prompt('日付（YYYY-MM-DD）');if(!date?.trim())return;const place=prompt('場所（任意）')||'';const body=prompt('内容（任意）')||'';try{await api('/api/events',{method:'POST',body:JSON.stringify({title,date,place,body})});toast('行事を追加しました');scheduleView($("#main"))}catch(e){toast(e.message)}}
+async function editEvent(e){const title=prompt('行事名',e.title||'');if(title===null)return;const date=prompt('日付',e.date||'');if(date===null)return;const place=prompt('場所',e.place||'');if(place===null)return;const body=prompt('内容',e.body||'');if(body===null)return;try{await api('/api/events/'+e.id,{method:'PATCH',body:JSON.stringify({title,date,place,body})});scheduleView($("#main"))}catch(x){toast(x.message)}}
+async function deleteEvent(id2){if(!confirm('この行事を削除しますか？'))return;try{await api('/api/events/'+id2,{method:'DELETE'});scheduleView($("#main"))}catch(e){toast(e.message)}}
+async function createTaskPrompt(){const title=prompt('課題名');if(!title?.trim())return;const subject=prompt('教科（任意）')||'';const dueAt=prompt('期限（YYYY-MM-DD、任意）')||'';const detail=prompt('内容（任意）')||'';try{await api('/api/tasks',{method:'POST',body:JSON.stringify({title,subject,dueAt:dueAt?new Date(dueAt).getTime():null,detail})});toast('課題を追加しました');scheduleView($("#main"))}catch(e){toast(e.message)}}
+async function editTask(t){const title=prompt('課題名',t.title||'');if(title===null)return;const subject=prompt('教科',t.subject||'');if(subject===null)return;const due=prompt('期限（YYYY-MM-DD、空欄で解除）',t.dueAt?new Date(t.dueAt).toISOString().slice(0,10):'');if(due===null)return;try{await api('/api/tasks/'+t.id,{method:'PATCH',body:JSON.stringify({title,subject,dueAt:due?new Date(due).getTime():null})});scheduleView($("#main"))}catch(e){toast(e.message)}}
+async function deleteTask(id2){if(!confirm('この課題を削除しますか？'))return;try{await api('/api/tasks/'+id2,{method:'DELETE'});scheduleView($("#main"))}catch(e){toast(e.message)}}
+async function toggleTask(id2){try{await api('/api/tasks/'+id2+'/complete',{method:'POST'});scheduleView($("#main"))}catch(e){toast(e.message)}}
 async function enableNovaPush(){
   if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))return toast('この端末・ブラウザはプッシュ通知に対応していません');
   try{
@@ -1218,11 +1218,11 @@ async function enableNovaPush(){
     let sub=await reg.pushManager.getSubscription();
     if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
     await api('/api/push/subscribe',{method:'POST',body:JSON.stringify({subscription:sub.toJSON()})});
-    toast('プッシュ通知を有効にしました');settings($('#main'));
+    toast('プッシュ通知を有効にしました');settings($("#main"));
   }catch(e){console.error('NOVA_PUSH_ERROR',e);toast(e?.message||'プッシュ通知を有効にできませんでした')}
 }
 async function disableNovaPush(){
-  try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(sub){await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})});await sub.unsubscribe()}toast('プッシュ通知を停止しました');settings($('#main'))}catch(e){toast(e?.message||'通知の停止に失敗しました')}
+  try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(sub){await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})});await sub.unsubscribe()}toast('プッシュ通知を停止しました');settings($("#main"))}catch(e){toast(e?.message||'通知の停止に失敗しました')}
 }
 async function board(m){
   let active='grade';
@@ -1303,7 +1303,7 @@ async function moveSchoolUserPrompt(id){
   if(!['1','2','3'].includes(String(grade)))return toast('学年は1〜3です');
   const className=prompt('移動先のクラス');if(className===null)return;
   const attendanceNo=prompt('出席番号（変更しない場合は空欄）');
-  try{await api('/api/school/users/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({grade,className,attendanceNo:attendanceNo||undefined})});toast('所属を変更しました');settings($('#main'))}catch(x){toast(x.message)}
+  try{await api('/api/school/users/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({grade,className,attendanceNo:attendanceNo||undefined})});toast('所属を変更しました');settings($("#main"))}catch(x){toast(x.message)}
 }
 
 function settingsPhoto(e){
