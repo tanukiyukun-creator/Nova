@@ -503,7 +503,7 @@ async function chat(m){
   const selectedFriend=chatRoom==='friend'&&chatTarget?friends.find(x=>x.id===chatTarget):null;
   const selectedGroup=chatRoom.startsWith('group:')?groups.find(x=>x.id===chatRoom.slice(6)):null;
   const room=rooms.find(r=>r.id===chatRoom);
-  const mobileChatOpen=!!(selectedFriend||selectedGroup);
+  const mobileChatOpen=!!(room||selectedFriend||selectedGroup);
   const title=selectedFriend?.displayName||selectedGroup?.name||room?.title||'トーク';
   const sub=selectedFriend?'個人トーク':selectedGroup?(selectedGroup.memberIds.length+'人のグループ'):room?.sub||'';
   let boxHtml=''; try{boxHtml=chatRoom==='friend'&&chatTarget?await chatHtml(chatTarget):await groupChatHtml(chatRoom)}catch(e){boxHtml='<div class="chat-empty-state"><b>トークを読み込めませんでした</b><small>'+esc(e.message||'通信エラー')+'</small></div>'}
@@ -706,8 +706,8 @@ async function startElectionPrompt(room){
     toast(e.message);
   }
 }
-async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
-async function closeMobileChat(){chatTarget=null;chatRoom='';await render(true)}
+async async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
+async function closeMobileChat(){chatTarget=null;chatRoom='class';await render(true)}
 async function groupChatHtml(room,fallbackMessage=null){
   let data;
   if(room==='class')data=await api('/api/talks/class');
