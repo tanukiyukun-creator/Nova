@@ -874,15 +874,14 @@ function clearIncomingCallUi(){document.getElementById('incomingCallPrompt')?.re
 function showIncomingCallPrompt(x){
   const existing=document.getElementById('incomingCallPrompt');if(existing)existing.remove();
   const mode=x.mode==='video'?'video':'audio';
-  const title=esc(x.fromName||'着信');
+  const title=esc(x.fromName||'相手');
+  const payload=JSON.stringify(x).replace(/\\/g,'\\\\').replace(/"/g,'&quot;');
   const b=document.createElement('div');b.id='incomingCallPrompt';b.className='call-incoming glass';
-  b.innerHTML='<div class="call-head"><b>着信</b></div><div class="call-incoming-body"><div class="call-avatar">☎</div><strong>'+title+'からの'+(mode==='video'?'ビデオ':'音声')+'通話</strong><p>応答しますか？</p></div><div class="call-incoming-actions"><button class="btn alt" onclick="rejectIncomingCall()">拒否</button><button class="btn primary-btn" onclick="answerIncomingCall('+JSON.stringify(x)+')">応答</button></div>';
+  b.innerHTML='<div class="call-head"><b>着信</b></div><div class="call-incoming-body"><div class="call-avatar">☎</div><strong>'+title+'からの'+(mode==='video'?'ビデオ':'音声')+'通話</strong><p>応答しますか？</p></div><div class="call-incoming-actions"><button class="btn alt" onclick="rejectIncomingCall('+payload+')">拒否</button><button class="btn primary-btn" onclick="answerIncomingCall('+payload+')">応答</button></div>';
   document.body.appendChild(b);
 }
-function rejectIncomingCall(){
-  const b=document.getElementById('incomingCallPrompt');
-  const raw=b?.dataset?.call;
-  if(raw){try{const x=JSON.parse(raw);sendCallSignal(x.fromUserId,{action:'reject',callId:x.callId})}catch{}}
+function rejectIncomingCall(raw){
+  try{const x=typeof raw==='string'?JSON.parse(raw):raw;if(x?.fromUserId)sendCallSignal(x.fromUserId,{action:'reject',callId:x.callId})}catch{}
   clearIncomingCallUi();
 }
 async function answerIncomingCall(raw){
@@ -1323,6 +1322,9 @@ async function enableNovaPush(){
 async function disableNovaPush(){
   try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(sub){await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})});await sub.unsubscribe()}toast('プッシュ通知を停止しました');settings($("#main"))}catch(e){toast(e?.message||'通知の停止に失敗しました')}
 }
+async function testNovaPush(){
+  try{await api('/api/push/test',{method:'POST',body:'{}'});toast('テスト通知を送信しました')}catch(e){toast(e?.message||'テスト通知を送信できませんでした')}
+}
 async function board(m){
   let active='grade';
   const renderBoard=async(kind)=>{
@@ -1388,7 +1390,7 @@ async function settings(m){
         <div class="settings-card-title"><b>通知・通話</b><span>アプリを開いていないときも通知できます</span></div>
         <label class="setting-check"><input id="notif" type="checkbox" ${me.settings?.notifications?'checked':''}> プッシュ通知を受け取る</label>
         <label class="setting-check"><input id="call" type="checkbox" ${me.settings?.callSound?'checked':''}> 通話着信通知を受け取る</label>
-        <div class="push-settings-row"><button type="button" class="btn alt" onclick="enableNovaPush()">端末の通知を有効にする</button><button type="button" class="btn alt" onclick="disableNovaPush()">通知を停止</button></div>
+        <div class="push-settings-row"><button type="button" class="btn alt" onclick="enableNovaPush()">端末の通知を有効にする</button><button type="button" class="btn alt" onclick="disableNovaPush()">通知を停止</button><button type="button" class="btn alt" onclick="testNovaPush()">テスト通知</button></div>
         <div class="sub" style="margin-top:8px">iPhone・iPadはホーム画面にNovaを追加したあと、通知を許可してください。</div>
       </section>
       <div class="settings-actions"><button class="btn primary-btn" type="submit">変更を保存</button></div>
