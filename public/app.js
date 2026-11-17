@@ -978,7 +978,7 @@ async function adminPanel(){
 async function startElection(type){const us=await api('/api/users/search?q=');const ids=us.slice(0,5).map(x=>x.id);try{await api('/api/elections',{method:'POST',body:JSON.stringify({type,candidateIds:ids})});toast('選挙を開始しました');school($('#main'))}catch(x){toast(x.message)}}
 async function people(m){const f=await api('/api/friends');m.innerHTML=`<div class="glass card"><div class="row"><input id="uq" class="input" placeholder="友達を検索" oninput="searchUsers()"></div><div id="users" class="list">${f.map(x=>userRow(x,false)).join('')}</div></div>`}function userRow(u,friend=true){return `<div class="item row"><div class="avatar">${esc(u.icon)}</div><div style="flex:1"><b>${esc(u.displayName)}</b><div class="sub">${esc(u.schoolName)} / ${esc(u.grade)}年${esc(u.className)}</div></div>${friend?'':'<button class="btn alt" onclick="addFriend(\''+u.id+'\')">追加</button>'}</div>`}async function searchUsers(){const q=$('#uq').value;const us=await api('/api/users/search?q='+encodeURIComponent(q));$('#users').innerHTML=us.map(x=>userRow(x,false)).join('')||'<p class="sub">見つかりません</p>'}async function addFriend(id2){await api('/api/friends/'+id2,{method:'POST'});toast('友達に追加しました');people($('#main'))}
 async function study(m){
-  books=await api('/api/study/books');
+  try{books=await api('/api/study/books')}catch(e){m.innerHTML='<section class="glass card"><h2>学習を読み込めませんでした</h2><p class="sub">単語帳データの取得に失敗しました。ページを再読み込みしてください。</p><button class="btn primary-btn" onclick="go(\"study\")">再読み込み</button></section>';return}
   const cards=books.map(b=>{
     const seen=studyGetSeen(b.id).length;
     let total=0,stats={answered:0,correct:0};
@@ -994,6 +994,8 @@ function estimateBookSize(id2){
 async function loadStudyBook(id2,pth){
   let entries=window.NOVA_BOOKS?.[id2];
   if(entries)return entries;
+  const meta=books.find(x=>x.id===id2);
+  if(meta?.entries?.length){window.NOVA_BOOKS=window.NOVA_BOOKS||{};window.NOVA_BOOKS[id2]=meta.entries;return meta.entries;}
   const r=await fetch(pth,{cache:'no-store'});
   if(!r.ok)throw new Error('HTTP '+r.status+' / '+pth);
   const text=await r.text();
