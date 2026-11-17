@@ -812,7 +812,7 @@ mergeChatMessages(cacheRoom,[],x.message);
 if(view!=='chat')return;
 if(!box)return;
 if(box.querySelector('[data-message-id="'+CSS.escape(id)+'"]'))return;const empty=box.querySelector('.chat-empty-state');if(empty)box.innerHTML=messageBubble(x.message);else box.insertAdjacentHTML('beforeend',messageBubble(x.message));box.scrollTop=box.scrollHeight}catch{}};window.novaWs.onclose=()=>{window.novaWs=null;window.novaWsToken='';if(window.novaBanned)return;setTimeout(()=>me&&!window.novaBanned&&novaSessionToken()&&wsConnect(),2000)}}catch{}}function sendSignal(x){if(window.novaWs?.readyState===WebSocket.OPEN)window.novaWs.send(JSON.stringify(x))}
-let novaPeers={},novaStream=null,novaTargets=[],novaMode=null,novaRoomKey=null,novaCallId=null;
+let novaPeers={},novaStream=null,novaTargets=[],novaMode=null,novaRoomKey=null,novaCallId=null,novaPendingIce={};
 function callScope(){
   if(chatRoom==='friend')return {scope:'friend',ids:chatTarget?[chatTarget]:[]};
   if(chatRoom==='school'||chatRoom==='class'||chatRoom==='classadmin'||chatRoom==='gradeadmin')return {scope:chatRoom,ids:[]};
@@ -839,30 +839,68 @@ function createCallPeer(userId,initiator){
   return pc;
 }
 function attachRemoteStream(userId,stream){
-  let stage=$('#callStage');if(!stage)return;
+  const stage=$('#callStage');if(!stage||!stream)return;
+  if(novaMode==='audio'){
+    const a=document.getElementById('remoteAudio');
+    if(a){a.srcObject=stream;a.autoplay=true;a.playsInline=true;a.play?.().catch(()=>{});}
+    return;
+  }
   let v=document.getElementById('remote_'+userId);
   if(!v){v=document.createElement('video');v.id='remote_'+userId;v.autoplay=true;v.playsInline=true;v.className='remote-peer-video';v.dataset.userId=userId;stage.appendChild(v)}
-  v.srcObject=stream;
+  v.srcObject=stream;v.play?.().catch(()=>{});
 }
 function removeRemoteStream(userId){document.getElementById('remote_'+userId)?.remove()}
 async function startCall(mode){
   const c=callScope();if(!c)return toast('このトークでは通話できません');
   try{
+    if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('安全な接続（HTTPS）が必要です');
     const participants=await getCallParticipants();
+    if(!participants.length)return toast('通話相手がオンラインではありません');
     if(c.scope!=='friend'&&participants.length>7)return toast('通話は同時に8人までです');
     novaMode=mode;novaRoomKey=chatRoom;novaCallId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
-    novaTargets=participants.map(x=>x.id);
+    novaTargets=participants.map(x=>x.id);novaPendingIce={};
     novaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:mode==='video'});
     showCall(mode,novaStream);
-    if(!participants.length)return toast('通話相手がオンラインではありません');
     for(const p of participants)createCallPeer(p.id,true);
-  }catch{endCall(false);toast('通話を開始できませんでした')}
+  }catch(e){endCall(false);toast(e?.message||'通話を開始できませんでした')}
 }
 function showCall(mode,stream){
   let b=$('#callWindow');
   if(!b){b=document.createElement('div');b.id='callWindow';b.className='call-window glass';document.body.append(b)}
   b.innerHTML='<div class="call-head"><b>'+(mode==='video'?'ビデオ通話':'音声通話')+'</b><button onclick="endCall()">×</button></div><div id="callStage" class="call-stage">'+(mode==='video'?'<video id="localVideo" autoplay muted playsinline></video>':'<div class="call-avatar">☎</div>')+'<audio id="remoteAudio" autoplay></audio></div><div class="call-controls"><button class="call-end" onclick="endCall()">通話を終了</button></div>';
   if(mode==='video'&&stream&&$('#localVideo'))$('#localVideo').srcObject=stream;
+}
+function clearIncomingCallUi(){document.getElementById('incomingCallPrompt')?.remove()}
+function showIncomingCallPrompt(x){
+  const existing=document.getElementById('incomingCallPrompt');if(existing)existing.remove();
+  const mode=x.mode==='video'?'video':'audio';
+  const title=esc(x.fromName||'着信');
+  const b=document.createElement('div');b.id='incomingCallPrompt';b.className='call-incoming glass';
+  b.innerHTML='<div class="call-head"><b>着信</b></div><div class="call-incoming-body"><div class="call-avatar">☎</div><strong>'+title+'からの'+(mode==='video'?'ビデオ':'音声')+'通話</strong><p>応答しますか？</p></div><div class="call-incoming-actions"><button class="btn alt" onclick="rejectIncomingCall()">拒否</button><button class="btn primary-btn" onclick="answerIncomingCall('+JSON.stringify(x)+')">応答</button></div>';
+  document.body.appendChild(b);
+}
+function rejectIncomingCall(){
+  const b=document.getElementById('incomingCallPrompt');
+  const raw=b?.dataset?.call;
+  if(raw){try{const x=JSON.parse(raw);sendCallSignal(x.fromUserId,{action:'reject',callId:x.callId})}catch{}}
+  clearIncomingCallUi();
+}
+async function answerIncomingCall(raw){
+  clearIncomingCallUi();
+  const x=typeof raw==='string'?JSON.parse(raw):raw;
+  try{
+    if(novaCallId&&novaCallId!==x.callId)return;
+    novaCallId=x.callId;novaMode=x.mode==='video'?'video':'audio';novaRoomKey=chatRoom;novaTargets=[String(x.fromUserId)];novaPendingIce={};
+    novaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:novaMode==='video'});
+    showCall(novaMode,novaStream);
+    const pc=createCallPeer(String(x.fromUserId),false);
+    await pc.setRemoteDescription(x.offer);
+    const queued=novaPendingIce[peerKey(x.fromUserId)]||[];
+    for(const candidate of queued)await pc.addIceCandidate(candidate).catch(()=>{});
+    delete novaPendingIce[peerKey(x.fromUserId)];
+    const answer=await pc.createAnswer();await pc.setLocalDescription(answer);
+    sendCallSignal(x.fromUserId,{action:'answer',callId:x.callId,answer:pc.localDescription});
+  }catch(e){endCall(false);sendCallSignal(x.fromUserId,{action:'reject',callId:x.callId});toast(e?.message||'通話に応答できませんでした')}
 }
 async function handleCallSignal(x){
   if(x.action==='offer'){
@@ -873,17 +911,24 @@ async function handleCallSignal(x){
     const pc=novaPeers[peerKey(x.fromUserId)];if(pc)await pc.setRemoteDescription(x.answer);
   }else if(x.action==='ice'){
     if(x.callId!==novaCallId)return;
-    const pc=novaPeers[peerKey(x.fromUserId)];if(pc)await pc.setRemoteDescription(x.answer);
-  }else if(x.action==='ice'){
+    const pc=novaPeers[peerKey(x.fromUserId)];
+    if(pc){
+      if(pc.remoteDescription)await pc.addIceCandidate(x.candidate).catch(()=>{});
+      else(novaPendingIce[peerKey(x.fromUserId)]??=[]).push(x.candidate);
+    }
+  }else if(x.action==='reject'){
+    if(x.callId===novaCallId){toast('相手が応答しませんでした');if(novaTargets.length<=1)endCall(false)}
+  }else if(x.action==='hangup'){
     if(x.callId!==novaCallId)return;
-    const pc=novaPeers[peerKey(x.fromUserId)];if(pc)pc.addIceCandidate(x.candidate).catch(()=>{});
-  }else if(x.action==='reject'){toast('相手が応答しませんでした')}
-  else if(x.action==='hangup'){removeRemoteStream(x.fromUserId);if(Object.keys(novaPeers).length<=1)endCall(false)}
+    removeRemoteStream(x.fromUserId);
+    delete novaPeers[peerKey(x.fromUserId)];
+    if(Object.keys(novaPeers).length===0)endCall(false);
+  }
 }
 function endCall(notify=true){
-  if(notify&&novaTargets.length)novaTargets.forEach(id=>sendCallSignal(id,{action:'hangup',callId:novaCallId}));
+  if(notify&&novaTargets.length&&novaCallId)novaTargets.forEach(id=>sendCallSignal(id,{action:'hangup',callId:novaCallId}));
   Object.values(novaPeers).forEach(pc=>pc.close());
-  novaPeers={};novaStream?.getTracks().forEach(t=>t.stop());novaStream=null;novaTargets=[];novaCallId=null;novaMode=null;novaRoomKey=null;$('#callWindow')?.remove()
+  novaPeers={};novaPendingIce={};novaStream?.getTracks().forEach(t=>t.stop());novaStream=null;novaTargets=[];novaCallId=null;novaMode=null;novaRoomKey=null;clearIncomingCallUi();$('#callWindow')?.remove()
 }
 async function sendCurrentChat(e,extra={}){
   if(e)e.preventDefault();
