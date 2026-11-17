@@ -517,12 +517,51 @@ async function showTalkMembers(){
     const members=Array.isArray(data.members)?data.members:[];
     const title=room==='class'?'クラスメンバー':room==='classadmin'?'CLASS ADMIN メンバー':room==='gradeadmin'?'GRADE ADMIN メンバー':'グループメンバー';
     const canManageGroup=room.startsWith('group:')&&['SUPER_ADMIN','SCHOOL_ADMIN','GRADE_ADMIN','CLASS_ADMIN'].some(hasClientRole);
-    const manageButton=canManageGroup?'<div class="row" style="margin-bottom:12px"><button class="btn alt" onclick="openGroupMemberManager('+JSON.stringify(room.slice(6))+')">メンバーを管理</button></div>':'';
+    const canManageClass=room==='class'&&hasClientRole('CLASS_ADMIN');
+    const manageButton=canManageGroup?'<div class="row" style="margin-bottom:12px"><button class="btn alt" onclick="openGroupMemberManager('+JSON.stringify(room.slice(6))+')">メンバーを管理</button></div>':canManageClass?'<div class="row" style="margin-bottom:12px"><button class="btn alt" onclick="openClassMemberManager()">メンバーを管理</button></div>':'';
     const html='<div class="nova-members-modal" id="novaMembersModal"><div class="nova-members-bg" onclick="closeTalkMembers()"></div><div class="nova-members-card"><div class="nova-members-head"><div><div class="eyebrow">NOVA / TALK</div><h3>'+esc(title)+'</h3><small>'+members.length+'人</small></div><button type="button" class="nova-members-close" onclick="closeTalkMembers()">×</button></div>'+manageButton+'<div class="nova-members-list">'+members.map(u=>'<div class="nova-member-row">'+avatarHtml(u)+'<div><b>'+esc(u.displayName||'メンバー')+'</b><small>'+esc((u.grade?u.grade+'年':'')+(u.className?' '+u.className+'組':''))+'</small></div></div>').join('')+'</div></div></div>';
     document.body.insertAdjacentHTML('beforeend',html);
   }catch(e){toast(e.message||'メンバーを取得できません')}
 }
 function closeTalkMembers(){document.getElementById('novaMembersModal')?.remove()}
+async function openClassMemberManager(){
+  try{
+    const data=await api('/api/talks/class/members');
+    const members=Array.isArray(data.members)?data.members:[];
+    const modal=document.createElement('div');modal.className='nova-members-modal';modal.id='classManagerModal';
+    modal.innerHTML='<div class="nova-members-bg" onclick="document.getElementById(\\'classManagerModal\\')?.remove()"></div><div class="nova-members-card"><div class="nova-members-head"><div><div class="eyebrow">NOVA / CLASS ADMIN</div><h3>クラスメンバー管理</h3><small>参加・退会</small></div><button type="button" class="nova-members-close" onclick="document.getElementById(\\'classManagerModal\\')?.remove()">×</button></div><div class="friend-add-search"><input id="classMemberSearch" class="input" placeholder="クラスメンバーを検索" autocomplete="off"></div><div id="classMemberCandidates" class="nova-members-list"><div class="line-empty">名前を入力してください</div></div><div class="nova-members-list" id="classCurrentMembers">'+members.map(u=>'<div class="nova-member-row">'+avatarHtml(u)+'<div style="flex:1"><b>'+esc(u.displayName||'メンバー')+'</b><small>参加中</small></div>'+(String(u.id)===String(me.id)?'<span class="sub">自分</span>':'<button class="btn alt class-remove-btn" data-user-id="'+esc(String(u.id))+'">退会</button>')+'</div>').join('')+'</div></div>';
+    document.body.append(modal);
+    const current=new Set(members.map(u=>String(u.id)));
+    const search=async()=>{
+      const q=String($('#classMemberSearch')?.value||'').trim();
+      if(!q){$('#classMemberCandidates').innerHTML='<div class="line-empty">名前を入力してください</div>';return}
+      try{
+        const us=await api('/api/users/search?q='+encodeURIComponent(q));
+        const list=us.filter(u=>String(u.id)!==String(me.id)&&String(u.schoolId||'')===String(me.schoolId||'')&&String(u.grade||'')===String(me.grade||'')&&String(u.className||'')===String(me.className||'')&&!current.has(String(u.id)));
+        $('#classMemberCandidates').innerHTML=list.map(u=>'<div class="nova-member-row">'+avatarHtml(u)+'<div style="flex:1"><b>'+esc(u.displayName||'メンバー')+'</b><small>現在はトークから退会中</small></div><button class="btn alt class-add-btn" data-user-id="'+esc(String(u.id))+'">参加させる</button></div>').join('')||'<div class="line-empty">追加できるクラスメンバーが見つかりません</div>';
+      }catch(e){toast(e.message||'検索できません')}
+    };
+    $('#classMemberSearch')?.addEventListener('input',search);
+    modal.addEventListener('click',async e=>{
+      const add=e.target.closest('.class-add-btn');
+      const rem=e.target.closest('.class-remove-btn');
+      try{
+        if(add){
+          add.disabled=true;
+          await api('/api/talks/class/members',{method:'POST',body:JSON.stringify({userId:add.dataset.userId})});
+          toast('メンバーを参加させました');
+          modal.remove();openClassMemberManager();
+        }else if(rem){
+          if(!confirm('このメンバーをクラストークから退会させますか？'))return;
+          rem.disabled=true;
+          await api('/api/talks/class/members/'+encodeURIComponent(rem.dataset.userId),{method:'DELETE'});
+          toast('メンバーを退会させました');
+          modal.remove();openClassMemberManager();
+        }
+      }catch(x){toast(x.message||'変更できません')}
+    });
+  }catch(e){toast(e.message||'メンバー管理を開けません')}
+}
 async function openGroupMemberManager(groupId){
   try{
     const data=await api('/api/groups/'+encodeURIComponent(groupId)+'/members');
