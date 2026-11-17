@@ -2,6 +2,7 @@ import express from 'express';
 import {createServer} from 'http';
 import {WebSocketServer} from 'ws';
 import crypto from 'crypto';
+import webpush from 'web-push';
 import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
@@ -56,7 +57,30 @@ function auth(req,res,next){
 }
 function pub(u){const {passwordHash,...x}=u; x.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles:[]; return x}
 function hasRole(u,role){return u?.role===role||Array.isArray(u?.adminRoles)&&u.adminRoles.includes(role)}
-function notify(db,userId,type,title,body,meta={}){db.notifications.unshift({id:id(),userId,type,title,body,...meta,read:false,createdAt:Date.now()});}
+function pushConfigured(){return !!(process.env.NOVA_VAPID_PUBLIC_KEY&&process.env.NOVA_VAPID_PRIVATE_KEY)}
+function configureWebPush(){if(!pushConfigured())return false;try{webpush.setVapidDetails(process.env.NOVA_VAPID_SUBJECT||'mailto:admin@example.com',process.env.NOVA_VAPID_PUBLIC_KEY,process.env.NOVA_VAPID_PRIVATE_KEY);return true}catch(e){console.error('WEB_PUSH_CONFIG_ERROR',e);return false}}
+const webPushReady=configureWebPush();
+async function sendPushNotification(userId,payload){
+  if(!webPushReady)return;
+  try{
+    const db=load(),u=db.users.find(x=>String(x.id)===String(userId));
+    const subs=Array.isArray(u?.pushSubscriptions)?u.pushSubscriptions:[];
+    for(const sub of subs){
+      try{await webpush.sendNotification(sub,JSON.stringify(payload))}
+      catch(e){
+        if(e?.statusCode===404||e?.statusCode===410){
+          u.pushSubscriptions=subs.filter(x=>x.endpoint!==sub.endpoint);save(db);
+        }
+      }
+    }
+  }catch(e){console.error('WEB_PUSH_SEND_ERROR',e)}
+}
+function notify(db,userId,type,title,body,meta={}){
+  const n={id:id(),userId,type,title,body,...meta,read:false,createdAt:Date.now()};
+  db.notifications.unshift(n);
+  setImmediate(()=>sendPushNotification(userId,{title,body,data:{type,...meta}}));
+  return n;
+}
 function sameGroup(a,b){return a.schoolId===b.schoolId&&a.grade===b.grade&&a.className===b.className}
 function ensureUserSchoolIdentity(db,u){if(!u)return null;const name=String(u.schoolName||'').trim();if(!name)return u;let school=db.schools.find(x=>String(x.name||'').trim()===name);if(!school){school={id:id(),masterId:null,name,grades:[]};db.schools.push(school)}if(u.schoolId!==school.id)u.schoolId=school.id;u.schoolName=school.name;return u}
 
@@ -372,6 +396,26 @@ app.post('/api/chats/:otherId/read',auth,async(req,res)=>{try{
 app.post('/api/messages/:id/delete',auth,(req,res)=>{const db=load();const m=db.messages.find(x=>x.id===req.params.id)||loadDirectMessages().find(x=>x.id===req.params.id);if(!m)return res.status(404).json({error:'メッセージが見つかりません'});if(String(m.from)!==String(req.user.id))return res.status(403).json({error:'自分のメッセージのみ送信取り消しできます'});if(m.type==='direct'){const rows=loadDirectMessages().filter(x=>x.id!==m.id);saveDirectMessages(rows)}else{db.messages=db.messages.filter(x=>x.id!==m.id);save(db)}wss.clients.forEach(c=>{if(c.readyState===1)c.send(JSON.stringify({type:'message_deleted',messageId:m.id}))});res.json({ok:true});});
 app.post('/api/talks/:room/read',auth,async(req,res)=>{const room=String(req.params.room);if(!['class','classadmin','gradeadmin'].includes(room))return res.status(400).json({error:'トーク種別が不正です'});try{await withDbWrite(db=>{const talk=ensureTalk(db,req.user,room);if(!talk.memberIds.includes(req.user.id))throw Object.assign(new Error('このトークのメンバーではありません'),{status:403});const ids=db.talks.filter(t=>t.room===room&&String(t.schoolId)===String(req.user.schoolId)&&(room==='gradeadmin'||String(t.grade||'')===String(req.user.grade))&&(room==='gradeadmin'||String(t.className||'')===String(req.user.className))).map(t=>t.id);if(!ids.includes(talk.id))ids.push(talk.id);db.messages.filter(m=>!m.deleted&&ids.includes(m.talkId)&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)})});res.json({ok:true})}catch(e){res.status(e.status||500).json({error:e.message||'既読更新に失敗しました'})}});
 app.post('/api/groups/:id/read',auth,async(req,res)=>{try{await withDbWrite(db=>{const talk=(db.talks||[]).find(t=>t.id===req.params.id&&t.room==='group');if(!talk||!talk.memberIds.includes(req.user.id))throw Object.assign(new Error('このグループのメンバーではありません'),{status:403});db.messages.filter(m=>!m.deleted&&m.talkId===talk.id&&m.from!==req.user.id).forEach(m=>{m.readBy=Array.isArray(m.readBy)?m.readBy:[];if(!m.readBy.includes(req.user.id))m.readBy.push(req.user.id)})});res.json({ok:true})}catch(e){res.status(e.status||500).json({error:e.message||'既読更新に失敗しました'})}});
+app.get('/api/push/status',auth,(req,res)=>res.json({available:webPushReady,subscribed:Array.isArray(req.user.pushSubscriptions)&&req.user.pushSubscriptions.length>0}));
+app.get('/api/push/vapid-public-key',auth,(req,res)=>{
+  if(!webPushReady)return res.status(503).json({error:'プッシュ通知のサーバー設定が未完了です'});
+  res.json({publicKey:process.env.NOVA_VAPID_PUBLIC_KEY});
+});
+app.post('/api/push/subscribe',auth,(req,res)=>{
+  if(!webPushReady)return res.status(503).json({error:'プッシュ通知のサーバー設定が未完了です'});
+  const sub=req.body?.subscription;
+  if(!sub?.endpoint||!sub?.keys?.p256dh||!sub?.keys?.auth)return res.status(400).json({error:'通知購読情報が不正です'});
+  const db=load(),u=db.users.find(x=>x.id===req.user.id);
+  u.pushSubscriptions=Array.isArray(u.pushSubscriptions)?u.pushSubscriptions:[];
+  u.pushSubscriptions=u.pushSubscriptions.filter(x=>x.endpoint!==sub.endpoint);
+  u.pushSubscriptions.push({endpoint:String(sub.endpoint),expirationTime:sub.expirationTime||null,keys:{p256dh:String(sub.keys.p256dh),auth:String(sub.keys.auth)}});
+  save(db);res.json({ok:true});
+});
+app.post('/api/push/unsubscribe',auth,(req,res)=>{
+  const endpoint=String(req.body?.endpoint||'');const db=load(),u=db.users.find(x=>x.id===req.user.id);
+  u.pushSubscriptions=Array.isArray(u.pushSubscriptions)?u.pushSubscriptions.filter(x=>x.endpoint!==endpoint):[];
+  save(db);res.json({ok:true});
+});
 app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifications.filter(n=>n.userId===req.user.id).slice(0,100))});
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
 function ensureInitialClassElection(db,user){const hasClassAdmin=db.users.some(u=>sameGroup(u,user)&&hasRole(u,'CLASS_ADMIN'));if(hasClassAdmin)return null;const scope=electionScope('CLASS_ADMIN',user);const open=db.elections.find(e=>e.status==='OPEN'&&e.type==='CLASS_ADMIN'&&e.schoolId===scope.schoolId&&e.grade===scope.grade&&e.className===scope.className);if(open)return open;const voters=electionVoters(db,{type:'CLASS_ADMIN',...scope});if(!voters.length)return null;const e={id:id(),type:'CLASS_ADMIN',...scope,candidates:[],voted:[],eligibleVoterIds:voters.map(u=>u.id),createdAt:Date.now(),endsAt:Date.now()+604800000,status:'OPEN',reelectionRequests:[],initialElection:true};db.elections.push(e);return e}
@@ -673,6 +717,9 @@ function promoteOwnerToSuperAdmin(){
 }
 promoteOwnerToSuperAdmin();
 const wsUsers=new Map();
+const pendingCallSignals=new Map();
+function queueCallSignal(userId,payload){const key=String(userId);const now=Date.now();const rows=(pendingCallSignals.get(key)||[]).filter(x=>now-x.at<120000);rows.push({at:now,payload});pendingCallSignals.set(key,rows.slice(-30));}
+function deliverPendingCallSignals(userId,ws){const key=String(userId),rows=pendingCallSignals.get(key)||[];pendingCallSignals.delete(key);rows.filter(x=>Date.now()-x.at<120000).forEach(x=>{if(ws.readyState===1)ws.send(JSON.stringify(x.payload))})}
 function userFromWsToken(raw){
   try{
     const [b,s]=String(raw||'').split('.');
@@ -690,16 +737,28 @@ wss.on('connection',(ws,req)=>{
   const q=new URL(req.url,'http://localhost').searchParams;
   const u=userFromWsToken(q.get('token'));
   if(!u){ws.close(1008,'auth');return}
-  ws.userId=String(u.id);wsUsers.set(String(u.id),ws);
+  ws.userId=String(u.id);wsUsers.set(String(u.id),ws);deliverPendingCallSignals(u.id,ws);
   ws.on('message',raw=>{
     try{
       const m=JSON.parse(String(raw));
       if(m.type==='call_signal'&&m.toUserId){
-        const target=wsUsers.get(m.toUserId);
-        if(target?.readyState===1)target.send(JSON.stringify({...m,fromUserId:u.id}));
+        const payload={...m,fromUserId:u.id};
+        const target=wsUsers.get(String(m.toUserId));
+        if(target?.readyState===1)target.send(JSON.stringify(payload));
+        else{
+          queueCallSignal(m.toUserId,payload);
+          if(m.action==='offer')notify(load(),m.toUserId,'call','着信',u.displayName+'から'+(m.mode==='video'?'ビデオ通話':'音声通話')+'の着信があります',{fromId:u.id,callId:m.callId,mode:m.mode,chatType:'call'});
+        }
       }else if(m.type==='call_signal'&&Array.isArray(m.toUserIds)){
-        const payload=JSON.stringify({...m,fromUserId:u.id});
-        [...new Set(m.toUserIds.map(String).filter(id=>id!==u.id))].forEach(id=>{const target=wsUsers.get(id);if(target?.readyState===1)target.send(payload)});
+        const payload={...m,fromUserId:u.id};
+        [...new Set(m.toUserIds.map(String).filter(id=>id!==String(u.id)))].forEach(id=>{
+          const target=wsUsers.get(id);
+          if(target?.readyState===1)target.send(JSON.stringify(payload));
+          else{
+            queueCallSignal(id,payload);
+            if(m.action==='offer')notify(load(),id,'call','着信',u.displayName+'から'+(m.mode==='video'?'ビデオ通話':'音声通話')+'の着信があります',{fromId:u.id,callId:m.callId,mode:m.mode,chatType:'call'});
+          }
+        });
       }
     }catch{}
   });
