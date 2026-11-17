@@ -978,15 +978,26 @@ async function adminPanel(){
 async function startElection(type){const us=await api('/api/users/search?q=');const ids=us.slice(0,5).map(x=>x.id);try{await api('/api/elections',{method:'POST',body:JSON.stringify({type,candidateIds:ids})});toast('選挙を開始しました');school($('#main'))}catch(x){toast(x.message)}}
 async function people(m){const f=await api('/api/friends');m.innerHTML=`<div class="glass card"><div class="row"><input id="uq" class="input" placeholder="友達を検索" oninput="searchUsers()"></div><div id="users" class="list">${f.map(x=>userRow(x,false)).join('')}</div></div>`}function userRow(u,friend=true){return `<div class="item row"><div class="avatar">${esc(u.icon)}</div><div style="flex:1"><b>${esc(u.displayName)}</b><div class="sub">${esc(u.schoolName)} / ${esc(u.grade)}年${esc(u.className)}</div></div>${friend?'':'<button class="btn alt" onclick="addFriend(\''+u.id+'\')">追加</button>'}</div>`}async function searchUsers(){const q=$('#uq').value;const us=await api('/api/users/search?q='+encodeURIComponent(q));$('#users').innerHTML=us.map(x=>userRow(x,false)).join('')||'<p class="sub">見つかりません</p>'}async function addFriend(id2){await api('/api/friends/'+id2,{method:'POST'});toast('友達に追加しました');people($('#main'))}
 async function study(m){
-  try{books=await api('/api/study/books')}catch(e){m.innerHTML='<section class="glass card"><h2>学習を読み込めませんでした</h2><p class="sub">単語帳データの取得に失敗しました。ページを再読み込みしてください。</p><button class="btn primary-btn" onclick="go(\"study\")">再読み込み</button></section>';return}
+  try{books=await api('/api/study/books')}catch(e){
+    m.innerHTML='<section class="glass card"><h2>学習を読み込めませんでした</h2><p class="sub">単語帳データの取得に失敗しました。ページを再読み込みしてください。</p><button class="btn primary-btn" id="studyReload">再読み込み</button></section>';
+    $('#studyReload')?.addEventListener('click',()=>go('study'));return;
+  }
+  window.NOVA_STUDY_BOOKS=books;
   const cards=books.map(b=>{
     const seen=studyGetSeen(b.id).length;
     let total=0,stats={answered:0,correct:0};
     try{stats={...stats,...JSON.parse(localStorage.getItem(studyStatsKey(b.id))||'{}')}}catch{}
     total=stats.answered?Math.round(stats.correct/stats.answered*100):0;
-    return '<section class="study-book-card glass"><div class="study-book-top"><span class="study-book-mark">'+bookIconHtml()+'</span><div><b>'+esc(b.name)+'</b><small>単語帳を開いて学習</small></div></div><div class="study-progress-track"><span style="width:'+Math.min(100,Math.round(seen/Math.max(1,estimateBookSize(b.id))*100))+'%"></span></div><div class="study-book-meta"><span>'+seen+'語学習済み</span><span>正答率 '+total+'%</span></div><div class="study-book-actions"><button class="btn primary-btn" onclick="openStudySetup('+esc(JSON.stringify(b.id))+','+esc(JSON.stringify(b.name))+','+esc(JSON.stringify(b.path))+')">学習する</button><button class="btn alt" onclick="openStudySearch('+esc(JSON.stringify(b.id))+','+esc(JSON.stringify(b.name))+','+esc(JSON.stringify(b.path))+')">単語検索</button></div></section>'
+    return '<section class="study-book-card glass"><div class="study-book-top"><span class="study-book-mark">'+bookIconHtml()+'</span><div><b>'+esc(b.name)+'</b><small>単語帳を開いて学習</small></div></div><div class="study-progress-track"><span style="width:'+Math.min(100,Math.round(seen/Math.max(1,estimateBookSize(b.id))*100))+'%"></span></div><div class="study-book-meta"><span>'+seen+'語学習済み</span><span>正答率 '+total+'%</span></div><div class="study-book-actions"><button class="btn primary-btn study-open-btn" data-book-id="'+esc(b.id)+'">学習する</button><button class="btn alt study-search-btn" data-book-id="'+esc(b.id)+'">単語検索</button></div></section>'
   }).join('');
-  m.innerHTML='<div class="study-page"><section class="study-hero glass"><div><div class="eyebrow">NOVA STUDY</div><h2>単語を、覚えるまで。</h2><p>範囲・順番・出題方向・問題形式を自分で設定。4択、入力、リスニング、書き取り、フラッシュカードに対応しています。</p></div><div class="study-hero-actions"><button class="btn alt" onclick="openStudySearch()">単語・意味を検索</button></div></section><div class="study-section-head"><div><div class="eyebrow">WORD BOOKS</div><h3>単語帳</h3></div><span class="sub">4冊収録</span></div><div class="study-book-grid">'+cards+'</div></div>';
+  m.innerHTML='<div class="study-page"><section class="study-hero glass"><div><div class="eyebrow">NOVA STUDY</div><h2>単語を、覚えるまで。</h2><p>範囲・順番・出題方向・問題形式を自分で設定。4択、入力、リスニング、書き取り、フラッシュカードに対応しています。</p></div><div class="study-hero-actions"><button class="btn alt" id="studyGlobalSearch">単語・意味を検索</button></div></section><div class="study-section-head"><div><div class="eyebrow">WORD BOOKS</div><h3>単語帳</h3></div><span class="sub">4冊収録</span></div><div class="study-book-grid">'+cards+'</div></div>';
+  $('#studyGlobalSearch')?.addEventListener('click',()=>openStudySearch());
+  m.querySelectorAll('.study-open-btn').forEach(b=>b.addEventListener('click',()=>{
+    const x=books.find(v=>v.id===b.dataset.bookId);if(x)openStudySetup(x.id,x.name,x.path);
+  }));
+  m.querySelectorAll('.study-search-btn').forEach(b=>b.addEventListener('click',()=>{
+    const x=books.find(v=>v.id===b.dataset.bookId);if(x)openStudySearch(x.id,x.name,x.path);
+  }));
 }
 function estimateBookSize(id2){
   return id2==='target1200'?1500:id2==='target1900'?1900:id2==='tekkyoku'?2000:400;
@@ -1009,11 +1020,18 @@ async function openStudySearch(id2='',name='',pth=''){
   try{
     if(id2){
       const entries=await loadStudyBook(id2,pth);
-      $('#main').innerHTML='<div class="study-search-page"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">WORD SEARCH</div><h2>'+esc(name)+'</h2><p class="sub">単語・意味・番号から検索できます。</p></div><button class="btn alt" onclick="go(&quot;study&quot;)">戻る</button></div><input id="studySearchInput" class="input study-search-input" placeholder="例：abundant / 豊富 / 1192" autocomplete="off" oninput="filterStudySearch('+JSON.stringify(id2)+')"><div id="studySearchResults"></div></section></div>';
+      window.NOVA_STUDY_SEARCH_ID=id2;
+      $('#main').innerHTML='<div class="study-search-page"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">WORD SEARCH</div><h2>'+esc(name)+'</h2><p class="sub">単語・意味・番号から検索できます。</p></div><button class="btn alt" id="studySearchBack">戻る</button></div><input id="studySearchInput" class="input study-search-input" placeholder="例：abundant / 豊富 / 1192" autocomplete="off"><div id="studySearchResults"></div></section></div>';
+      $('#studySearchBack')?.addEventListener('click',()=>go('study'));
+      const input=$('#studySearchInput');input?.addEventListener('input',()=>renderStudySearchResults(entries,String(input.value||'').trim().toLowerCase()));
       renderStudySearchResults(entries,'');
     }else{
-      books=await api('/api/study/books');
-      $('#main').innerHTML='<div class="study-search-page"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">WORD SEARCH</div><h2>単語・意味を検索</h2><p class="sub">単語帳を選択して検索してください。</p></div><button class="btn alt" onclick="go(&quot;study&quot;)">戻る</button></div><div class="study-search-books">'+books.map(b=>'<button class="study-search-book" onclick="openStudySearch('+esc(JSON.stringify(b.id))+','+esc(JSON.stringify(b.name))+','+esc(JSON.stringify(b.path))+')"><b>'+esc(b.name)+'</b><span>検索する ›</span></button>').join('')+'</div></section></div>';
+      books=await api('/api/study/books');window.NOVA_STUDY_BOOKS=books;
+      $('#main').innerHTML='<div class="study-search-page"><section class="glass card"><div class="study-setup-head"><div><div class="eyebrow">WORD SEARCH</div><h2>単語・意味を検索</h2><p class="sub">単語帳を選択して検索してください。</p></div><button class="btn alt" id="studySearchBack">戻る</button></div><div class="study-search-books">'+books.map(b=>'<button class="study-search-book" data-book-id="'+esc(b.id)+'"><b>'+esc(b.name)+'</b><span>検索する ›</span></button>').join('')+'</div></section></div>';
+      $('#studySearchBack')?.addEventListener('click',()=>go('study'));
+      document.querySelectorAll('.study-search-book').forEach(btn=>btn.addEventListener('click',()=>{
+        const x=books.find(v=>v.id===btn.dataset.bookId);if(x)openStudySearch(x.id,x.name,x.path);
+      }));
     }
   }catch(e){toast('単語データを読み込めませんでした: '+(e.message||'不明なエラー'))}
 }
@@ -1024,11 +1042,15 @@ function filterStudySearch(id2){
 function renderStudySearchResults(entries,q){
   const box=$('#studySearchResults');if(!box)return;
   const list=entries.filter(x=>!q||String(x.no).includes(q)||String(x.q).toLowerCase().includes(q)||String(x.a).toLowerCase().includes(q)).slice(0,80);
-  box.innerHTML='<div class="study-search-count">'+(q?list.length+'件':'全'+entries.length+'語中、先頭80件を表示')+'</div>'+(list.length?list.map(x=>'<button class="study-search-result" onclick="showStudyWord('+esc(JSON.stringify(x))+')"><span class="study-search-no">'+esc(x.no)+'</span><div><b>'+esc(x.q)+'</b><small>'+esc(x.a)+'</small></div><span>›</span></button>').join(''):'<div class="home-empty">該当する単語がありません。</div>');
+  window.NOVA_STUDY_SEARCH_RESULTS=list;
+  box.innerHTML='<div class="study-search-count">'+(q?list.length+'件':'全'+entries.length+'語中、先頭80件を表示')+'</div>'+(list.length?'<div class="study-search-results">'+list.map((x,i)=>'<button class="study-search-result" data-word-index="'+i+'"><span class="study-search-no">'+esc(x.no)+'</span><div><b>'+esc(x.q)+'</b><small>'+esc(x.a)+'</small></div><span>›</span></button>').join('')+'</div>':'<div class="home-empty">該当する単語がありません。</div>');
+  box.querySelectorAll('.study-search-result').forEach(btn=>btn.addEventListener('click',()=>{
+    const x=window.NOVA_STUDY_SEARCH_RESULTS?.[Number(btn.dataset.wordIndex)];if(x)showStudyWord(x);
+  }));
 }
 function showStudyWord(x){
   const modal=document.createElement('div');modal.className='nova-role-modal';
-  modal.innerHTML='<div class="nova-role-modal-bg"></div><div class="nova-role-modal-card glass"><div class="eyebrow">WORD</div><h3>'+esc(x.q)+'</h3><p style="white-space:pre-wrap">'+esc(x.a)+'</p><div class="nova-role-actions"><button class="btn alt" id="studyWordClose">閉じる</button></div></div>';
+  modal.innerHTML='<div class="nova-role-modal-bg"></div><div class="nova-role-modal-card glass study-word-modal"><div class="eyebrow">WORD</div><h3>'+esc(x.q)+'</h3><div class="study-word-answer">'+esc(x.a)+'</div><div class="nova-role-actions"><button class="btn alt" id="studyWordClose">閉じる</button></div></div>';
   document.body.append(modal);modal.querySelector('.nova-role-modal-bg').onclick=()=>modal.remove();modal.querySelector('#studyWordClose').onclick=()=>modal.remove();
 }
 async function openStudySetup(id2,name,pth){
@@ -1110,8 +1132,11 @@ function startStudy(id2){
 }
 function studyQuestionPair(x,direction,index=0){if(direction==='both')return index%2===0?{q:x.q,a:x.a,lang:'en-US'}:{q:x.a,a:x.q,lang:'ja-JP'};const dir=direction==='random'?(Math.random()<.5?'en-ja':'ja-en'):direction;return dir==='ja-en'?{q:x.a,a:x.q,lang:'ja-JP'}:{q:x.q,a:x.a,lang:'en-US'}}
 function renderStudyFeedback(ok){
-  const s=window.studySession;if(!s||!s.currentPair)return;const x=s.pool[s.i],p=s.currentPair;studySaveSeen(s.id,x.no);studySaveStat(s.id,ok);if(ok)s.correct++;else{studySaveWrong(s.id,x.no);s.wrong.push(x)}s.answered=true;
-  $('#main').innerHTML='<section class="glass card study-question study-feedback"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-question-type">'+(ok?'CORRECT':'INCORRECT')+'</div><div class="study-feedback-result '+(ok?'correct':'incorrect')+'">'+(ok?'正解！':'不正解')+'</div><div class="study-prompt">'+esc(p.q)+'</div><div class="study-answer-label">正解</div><div class="study-correct-answer">'+esc(p.a)+'</div>'+(s.speak?'<button class="btn alt" onclick="studySpeak('+JSON.stringify(p.a)+','+JSON.stringify(p.lang)+')">🔊 正解を読み上げる</button>':'')+'<button class="btn primary-btn" onclick="nextStudyQuestion()">次の問題</button></section>';
+  const s=window.studySession;if(!s||!s.currentPair)return;const x=s.pool[s.i],p=s.currentPair;
+  studySaveSeen(s.id,x.no);studySaveStat(s.id,ok);if(ok)s.correct++;else{studySaveWrong(s.id,x.no);s.wrong.push(x)}s.answered=true;
+  $('#main').innerHTML='<section class="glass card study-question study-feedback"><div class="study-progress">'+(s.i+1)+' / '+s.pool.length+'</div><div class="study-question-type">'+(ok?'CORRECT':'INCORRECT')+'</div><div class="study-feedback-result '+(ok?'correct':'incorrect')+'">'+(ok?'正解！':'不正解')+'</div><div class="study-prompt study-feedback-prompt">'+esc(p.q)+'</div><div class="study-answer-label">正解</div><div class="study-correct-answer">'+esc(p.a)+'</div>'+(s.speak?'<button class="btn alt study-speak-answer" id="studySpeakAnswer">🔊 正解を読み上げる</button>':'')+'<button class="btn primary-btn study-next-btn" id="studyNextBtn">次の問題</button></section>';
+  $('#studySpeakAnswer')?.addEventListener('click',()=>studySpeak(p.a,p.lang));
+  $('#studyNextBtn')?.addEventListener('click',nextStudyQuestion);
 }
 function nextStudyQuestion(){const s=window.studySession;if(!s||!s.answered)return;s.i++;s.currentPair=null;s.answered=false;runStudyQuestion()}
 function studyChoiceAnswer(value){const s=window.studySession;if(!s||s.answered||!s.currentPair)return;renderStudyFeedback(String(value)===String(s.currentPair.a))}
@@ -1139,7 +1164,7 @@ function renderFlashStudy(){
   if(s.speak&&!s.show)setTimeout(()=>studySpeak(p.q,p.lang),250);
 }
 function flashStudyReveal(){const s=window.flashStudy;if(!s)return;if(!s.show){s.show=true;studySaveSeen(s.id,s.pool[s.i].no);renderFlashStudy()}else{s.i++;s.show=false;renderFlashStudy()}}
-function finishStudy(){const s=window.studySession;if(!s)return;const acc=Math.round(s.correct/s.pool.length*100);$('#main').innerHTML='<section class="glass card study-result"><div class="eyebrow">STUDY COMPLETE</div><h2>学習終了</h2><div class="study-score"><strong>'+s.correct+'</strong><span>/ '+s.pool.length+'</span></div><p>正答率 '+acc+'%</p><div class="study-result-actions"><button class="btn primary-btn" onclick="go("study")">もう一度設定</button><button class="btn alt" onclick="startRetryStudy()">間違えたものをもう一度</button></div><div class="list">'+s.wrong.map(x=>'<div class="item"><b>'+esc(x.q)+'</b><div class="sub">'+esc(x.a)+'</div></div>').join('')||'<div class="home-empty">今回の間違いはありません。</div>'+'</div></section>'}
+function finishStudy(){const s=window.studySession;if(!s)return;const acc=Math.round(s.correct/s.pool.length*100);$('#main').innerHTML='<section class="glass card study-result"><div class="eyebrow">STUDY COMPLETE</div><h2>学習終了</h2><div class="study-score"><strong>'+s.correct+'</strong><span>/ '+s.pool.length+'</span></div><p>正答率 '+acc+'%</p><div class="study-result-actions"><button class="btn primary-btn" onclick="go(&quot;study&quot;)">もう一度設定</button><button class="btn alt" onclick="startRetryStudy()">間違えたものをもう一度</button></div><div class="list">'+s.wrong.map(x=>'<div class="item"><b>'+esc(x.q)+'</b><div class="sub">'+esc(x.a)+'</div></div>').join('')||'<div class="home-empty">今回の間違いはありません。</div>'+'</div></section>'}
 function startRetryStudy(){const s=window.studySession;if(!s?.wrong.length)return toast('間違えた問題はありません');s.pool=[...s.wrong];s.i=0;s.correct=0;s.wrong=[];s.currentPair=null;s.answered=false;runStudyQuestion()}
 function finishStudyFlash(){const s=window.flashStudy;$('#main').innerHTML='<section class="glass card study-result"><div class="eyebrow">FLASHCARD COMPLETE</div><h2>フラッシュカード終了</h2><p>'+s.pool.length+'語を確認しました。</p><button class="btn primary-btn" onclick="go("study")">もう一度設定</button></section>'}
 async function scheduleView(m){
