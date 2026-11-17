@@ -692,6 +692,29 @@ function triggerReelectionForRole(db,role,user){
 function startElection(db,user,type,candidateIds){const s=electionScope(type,user);if(db.elections.some(e=>e.status==='OPEN'&&e.type===type&&e.schoolId===s.schoolId&&(e.grade==null||e.grade===s.grade)&&(e.className==null||e.className===s.className)))throw new Error('この範囲では既に選挙が行われています');const candidates=[...new Set((candidateIds||[]).map(String))].map(uid=>db.users.find(u=>u.id===uid)).filter(Boolean);const valid=candidates.filter(u=>type==='CLASS_ADMIN'?sameGroup(u,user):type==='GRADE_ADMIN'?u.schoolId===user.schoolId&&u.grade===user.grade:u.schoolId===user.schoolId);if(!valid.length)throw new Error('候補者がいません');const e={id:id(),type,...s,candidates:valid.map(u=>({id:id(),userId:u.id,votes:0})),voted:[],eligibleVoterIds:electionVoters(db,{type,...s}).map(u=>u.id),createdAt:Date.now(),endsAt:Date.now()+604800000,status:'OPEN',reelectionRequests:[]};db.elections.push(e);return e}
 app.get('/api/school/users',auth,(req,res)=>{if(!(hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'SUPER_ADMIN')))return res.status(403).json({error:'権限がありません'});const db=load();res.json(db.users.filter(u=>u.schoolId===req.user.schoolId).map(pub))});
 app.patch('/api/school/users/:id',auth,(req,res)=>{if(!(hasRole(req.user,'SCHOOL_ADMIN')||hasRole(req.user,'SUPER_ADMIN')))return res.status(403).json({error:'権限がありません'});const db=load(),u=db.users.find(x=>x.id===req.params.id);if(!u||u.schoolId!==req.user.schoolId)return res.status(404).json({error:'生徒が見つかりません'});if(req.body.grade!=null)u.grade=String(req.body.grade);if(req.body.className!=null)u.className=String(req.body.className).trim();if(req.body.attendanceNo!=null)u.attendanceNo=String(req.body.attendanceNo);syncAdminTalks(db);save(db);res.json(pub(u))});
+app.get('/api/super/users/:id/profile',auth,(req,res)=>{
+  if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).json({error:'権限がありません'});
+  const db=load(),u=db.users.find(x=>String(x.id)===String(req.params.id));
+  if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});
+  res.json({...pub(u),passwordConfigured:!!u.passwordHash});
+});
+app.patch('/api/super/users/:id/profile',auth,(req,res)=>{
+  if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).json({error:'権限がありません'});
+  const db=load(),u=db.users.find(x=>String(x.id)===String(req.params.id));
+  if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});
+  if(req.body.lastName!=null)u.lastName=String(req.body.lastName).trim();
+  if(req.body.firstName!=null)u.firstName=String(req.body.firstName).trim();
+  if(req.body.grade!=null)u.grade=String(req.body.grade).trim();
+  if(req.body.className!=null)u.className=String(req.body.className).trim();
+  if(req.body.attendanceNo!=null)u.attendanceNo=String(req.body.attendanceNo).trim();
+  u.displayName=[u.lastName,u.firstName].filter(Boolean).join(' ');
+  if(req.body.password!=null){
+    const p=String(req.body.password);
+    if(p.length<1)return res.status(400).json({error:'パスワードを入力してください'});
+    u.passwordHash=hash(p);
+  }
+  syncAdminTalks(db);save(db);res.json({...pub(u),passwordConfigured:!!u.passwordHash});
+});
 app.post('/api/super/users/:id/roles',auth,(req,res)=>{if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).json({error:'権限がありません'});const db=load(),u=db.users.find(x=>x.id===req.params.id);if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});const roles=Array.isArray(req.body.roles)?[...new Set(req.body.roles.map(String))]:[];const allowed=['CLASS_ADMIN','GRADE_ADMIN','SCHOOL_ADMIN','SUPER_ADMIN'];if(roles.some(r=>!allowed.includes(r)))return res.status(400).json({error:'不正な権限です'});if(u.id===req.user.id&&!roles.includes('SUPER_ADMIN'))return res.status(400).json({error:'自分のSUPER ADMIN権限は剥奪できません'});const old=[u.role,...(Array.isArray(u.adminRoles)?u.adminRoles:[])].filter(r=>r&&r!=='STUDENT');u.role=roles.includes('SUPER_ADMIN')?'SUPER_ADMIN':roles[0]||'STUDENT';u.adminRoles=roles.filter(r=>r!==u.role);for(const r of old.filter(r=>!roles.includes(r)))triggerReelectionForRole(db,r,u);syncAdminTalks(db);save(db);res.json({ok:true,user:pub(u)})});
 app.post('/api/super/users/:id/revoke-role',auth,(req,res)=>{if(!hasRole(req.user,'SUPER_ADMIN'))return res.status(403).json({error:'権限がありません'});const db=load(),u=db.users.find(x=>x.id===req.params.id);if(!u)return res.status(404).json({error:'ユーザーが見つかりません'});const role=String(req.body.role||'');if(role==='SUPER_ADMIN'&&u.id===req.user.id)return res.status(400).json({error:'自分のSUPER ADMIN権限は剥奪できません'});u.adminRoles=Array.isArray(u.adminRoles)?u.adminRoles.filter(x=>x!==role):[];if(u.role===role)u.role='STUDENT';syncAdminTalks(db);save(db);res.json({ok:true,user:pub(u)})});
 
