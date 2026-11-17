@@ -23,3 +23,6 @@
 .legal-doc .legal-date{color:#8f949e;margin-bottom:24px}
 .legal-doc .legal-note{margin-top:28px;padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.025);color:#969ba5;font-size:11px}
 @media(max-width:600px){.nova-legal-modal{padding:10px}.nova-legal-card{max-height:94vh}.nova-legal-body{padding:20px 17px}.legal-settings-actions .btn{width:100%}}
+
+.incoming-call{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100000;width:min(360px,90vw);padding:26px;border:1px solid rgba(255,255,255,.14);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.incoming-call-title{font-size:12px;letter-spacing:.16em;color:#aeb3bd}.incoming-call-name{font-size:22px;font-weight:700;margin-top:10px}.incoming-call-type{margin-top:6px;color:#aeb3bd}.incoming-call-actions{display:flex;gap:10px;margin-top:24px}.incoming-call-actions .btn{flex:1}
