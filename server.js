@@ -114,7 +114,8 @@ app.post('/api/register',(req,res)=>{
     const db=load();
     const {schoolId,schoolName,grade,className,attendanceNo,lastName,firstName,password,icon,legalConsent,legalVersion}=req.body;
     const displayName=[lastName,firstName].filter(Boolean).join(' ').trim();
-    if(!schoolName||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});\n    if(!legalConsent)return res.status(400).json({error:'利用規約・プライバシーポリシーへの同意が必要です'});
+    if(!schoolName||!grade||!className||!attendanceNo||!lastName||!firstName||!password)return res.status(400).json({error:'必須項目をすべて入力してください'});
+    if(!legalConsent)return res.status(400).json({error:'利用規約・プライバシーポリシーへの同意が必要です'});
     if(!['1','2','3'].includes(String(grade)))return res.status(400).json({error:'学年は1〜3から選択してください'});
     if(!/^\d+$/.test(String(attendanceNo))||Number(attendanceNo)<1)return res.status(400).json({error:'出席番号は1以上の数字で入力してください'});
     if(password.length<6)return res.status(400).json({error:'パスワードは6文字以上にしてください'});
