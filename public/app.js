@@ -706,7 +706,7 @@ async function startElectionPrompt(room){
     toast(e.message);
   }
 }
-async async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
+async function selectChatRoom(room){chatRoom=room;chatTarget=null;await render(true)}
 async function closeMobileChat(){chatTarget=null;chatRoom='class';await render(true)}
 async function groupChatHtml(room,fallbackMessage=null){
   let data;
