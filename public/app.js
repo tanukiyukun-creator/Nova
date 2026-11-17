@@ -800,18 +800,33 @@ function showCall(mode,stream){
 async function handleCallSignal(x){
   if(x.action==='offer'){
     if(novaCallId&&novaCallId!==x.callId)return;
-    if(!confirm('着信があります。通話に出ますか？')){sendCallSignal(x.fromUserId,{action:'reject',callId:x.callId});return}
-    try{
-      novaCallId=x.callId;novaMode=x.mode;novaTarget=x.fromUserId;
-      novaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:x.mode==='video'});
-      showCall(x.mode,novaStream);
-      const pc=createCallPeer(x.fromUserId,false);
-      await pc.setRemoteDescription(x.offer);
-      const ans=await pc.createAnswer();await pc.setLocalDescription(ans);
-      sendCallSignal(x.fromUserId,{action:'answer',callId:x.callId,answer:pc.localDescription});
-      if(!novaTargets.includes(x.fromUserId))novaTargets.push(x.fromUserId);
-    }catch{endCall(false)}
-  }else if(x.action==='answer'){
+    showIncomingCallPrompt(x);
+  }
+function showIncomingCallPrompt(x){
+  let b=document.getElementById('incomingCall');
+  if(!b){b=document.createElement('div');b.id='incomingCall';b.className='incoming-call glass';document.body.appendChild(b)}
+  b.innerHTML='<div class="incoming-call-title">着信</div><div class="incoming-call-name">'+esc(x.fromName||'着信があります')+'</div><div class="incoming-call-type">'+(x.mode==='video'?'ビデオ通話':'音声通話')+'</div><div class="incoming-call-actions"><button class="btn alt" onclick="rejectIncomingCall()">拒否</button><button class="btn primary-btn" onclick="answerIncomingCall()">応答</button></div>';
+  window.novaIncomingCall=x;
+}
+function rejectIncomingCall(){
+  const x=window.novaIncomingCall;if(x)sendCallSignal(x.fromUserId,{action:'reject',callId:x.callId});
+  window.novaIncomingCall=null;document.getElementById('incomingCall')?.remove();
+}
+async function answerIncomingCall(){
+  const x=window.novaIncomingCall;if(!x)return;
+  window.novaIncomingCall=null;document.getElementById('incomingCall')?.remove();
+  try{
+    novaCallId=x.callId;novaMode=x.mode;novaTarget=x.fromUserId;
+    novaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:x.mode==='video'});
+    showCall(x.mode,novaStream);
+    const pc=createCallPeer(x.fromUserId,false);
+    await pc.setRemoteDescription(x.offer);
+    const ans=await pc.createAnswer();await pc.setLocalDescription(ans);
+    sendCallSignal(x.fromUserId,{action:'answer',callId:x.callId,answer:pc.localDescription});
+    if(!novaTargets.includes(x.fromUserId))novaTargets.push(x.fromUserId);
+  }catch{endCall(false);toast('通話に応答できませんでした')}
+}
+else if(x.action==='answer'){
     if(x.callId!==novaCallId)return;
     const pc=novaPeers[peerKey(x.fromUserId)];if(pc)await pc.setRemoteDescription(x.answer);
   }else if(x.action==='ice'){
