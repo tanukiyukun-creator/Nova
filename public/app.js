@@ -513,12 +513,11 @@ async function showTalkMembers(){
   const room=chatRoom;
   if(!['class','classadmin','gradeadmin'].includes(room)&&!room.startsWith('group:'))return;
   try{
-    const data=room.startsWith('group:')
-      ?await api('/api/groups/'+encodeURIComponent(room.slice(6))+'/members')
-      :await api('/api/talks/'+encodeURIComponent(room)+'/members');
+    const data=room.startsWith('group:')?await api('/api/groups/'+encodeURIComponent(room.slice(6))+'/members'):await api('/api/talks/'+encodeURIComponent(room)+'/members');
     const members=Array.isArray(data.members)?data.members:[];
     const title=room==='class'?'クラスメンバー':room==='classadmin'?'CLASS ADMIN メンバー':room==='gradeadmin'?'GRADE ADMIN メンバー':'グループメンバー';
-    const html='<div class="nova-members-modal" id="novaMembersModal"><div class="nova-members-bg" onclick="closeTalkMembers()"></div><div class="nova-members-card"><div class="nova-members-head"><div><div class="eyebrow">NOVA / TALK</div><h3>'+esc(title)+'</h3><small>'+members.length+'人</small></div><button type="button" class="nova-members-close" onclick="closeTalkMembers()">×</button></div><div class="nova-members-list">'+members.map(u=>'<div class="nova-member-row">'+avatarHtml(u)+'<div><b>'+esc(u.displayName||'メンバー')+'</b><small>'+esc((u.grade?u.grade+'年':'')+(u.className?' '+u.className+'組':''))+'</small></div></div>').join('')+'</div></div></div>';
+    const canManageGroup=room.startsWith('group:')&&['SUPER_ADMIN','SCHOOL_ADMIN','GRADE_ADMIN','CLASS_ADMIN'].some(hasClientRole);
+    const html='<div class="nova-members-modal" id="novaMembersModal"><div class="nova-members-bg" onclick="closeTalkMembers()"></div><div class="nova-members-card"><div class="nova-members-head"><div><div class="eyebrow">NOVA / TALK</div><h3>'+esc(title)+'</h3><small>'+members.length+'人</small></div><button type="button" class="nova-members-close" onclick="closeTalkMembers()">×</button></div>'+((canManageGroup)?'<div class="row" style="margin-bottom:12px"><button class="btn alt" onclick="openGroupMemberManager(\\''+esc(room.slice(6))+"\\')">メンバーを管理</button></div>":'')+'<div class="nova-members-list">'+members.map(u=>'<div class="nova-member-row">'+avatarHtml(u)+'<div><b>'+esc(u.displayName||'メンバー')+'</b><small>'+esc((u.grade?u.grade+'年':'')+(u.className?' '+u.className+'組':''))+'</small></div></div>').join('')+'</div></div></div>';
     document.body.insertAdjacentHTML('beforeend',html);
   }catch(e){toast(e.message||'メンバーを取得できません')}
 }
