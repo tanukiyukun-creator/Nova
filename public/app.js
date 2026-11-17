@@ -523,6 +523,19 @@ async function showTalkMembers(){
   }catch(e){toast(e.message||'メンバーを取得できません')}
 }
 function closeTalkMembers(){document.getElementById('novaMembersModal')?.remove()}
+async function openGroupMemberManager(groupId){
+  try{
+    const data=await api('/api/groups/'+encodeURIComponent(groupId)+'/members');
+    const members=Array.isArray(data.members)?data.members:[];
+    const modal=document.createElement('div');modal.className='nova-members-modal';modal.id='groupManagerModal';
+    modal.innerHTML='<div class="nova-members-bg" onclick="document.getElementById(\\'groupManagerModal\\')?.remove()"></div><div class="nova-members-card"><div class="nova-members-head"><div><div class="eyebrow">NOVA / GROUP ADMIN</div><h3>メンバー管理</h3><small>追加・退会</small></div><button type="button" class="nova-members-close" onclick="document.getElementById(\\'groupManagerModal\\')?.remove()">×</button></div><div class="friend-add-search"><input id="groupMemberSearch" class="input" placeholder="追加する人を検索" autocomplete="off"></div><div id="groupMemberCandidates" class="nova-members-list"><div class="line-empty">名前や学校名を入力してください</div></div><div class="nova-members-list" id="groupCurrentMembers">'+members.map(u=>'<div class="nova-member-row">'+avatarHtml(u)+'<div style="flex:1"><b>'+esc(u.displayName||'メンバー')+'</b><small>参加中</small></div>'+(String(u.id)===String(me.id)?'<span class="sub">自分</span>':'<button class="btn alt group-remove-btn" data-user-id="'+esc(String(u.id))+'">退会</button>')+'</div>').join('')+'</div></div>';
+    document.body.append(modal);
+    const current=new Set(members.map(u=>String(u.id)));
+    const search=async()=>{const q=String($('#groupMemberSearch')?.value||'').trim();if(!q){$('#groupMemberCandidates').innerHTML='<div class="line-empty">名前や学校名を入力してください</div>';return}try{const us=await api('/api/users/search?q='+encodeURIComponent(q));const list=us.filter(u=>String(u.id)!==String(me.id)&&!current.has(String(u.id)));$('#groupMemberCandidates').innerHTML=list.map(u=>'<div class="nova-member-row">'+avatarHtml(u)+'<div style="flex:1"><b>'+esc(u.displayName||'メンバー')+'</b><small>'+esc((u.schoolName||'')+(u.grade?' · '+u.grade+'年':'')+(u.className?' '+u.className+'組':''))+'</small></div><button class="btn alt group-add-btn" data-user-id="'+esc(String(u.id))+'">追加</button></div>').join('')||'<div class="line-empty">追加できるユーザーが見つかりません</div>'}catch(e){toast(e.message||'検索できません')}};
+    $('#groupMemberSearch')?.addEventListener('input',search);
+    modal.addEventListener('click',async e=>{const add=e.target.closest('.group-add-btn');const rem=e.target.closest('.group-remove-btn');try{if(add){add.disabled=true;await api('/api/groups/'+encodeURIComponent(groupId)+'/members',{method:'POST',body:JSON.stringify({userId:add.dataset.userId})});toast('メンバーを追加しました');openGroupMemberManager(groupId);modal.remove()}else if(rem){if(!confirm('このメンバーをグループから退会させますか？'))return;rem.disabled=true;await api('/api/groups/'+encodeURIComponent(groupId)+'/members/'+encodeURIComponent(rem.dataset.userId),{method:'DELETE'});toast('メンバーを退会させました');openGroupMemberManager(groupId);modal.remove()}}catch(e){toast(e.message||'メンバー操作に失敗しました')}});
+  }catch(e){toast(e.message||'メンバー管理を開けません')}
+}
 async function openFriendAdd(){
   const html='<div class="nova-members-modal" id="friendAddModal"><div class="nova-members-bg" onclick="closeFriendAdd()"></div><div class="nova-members-card"><div class="nova-members-head"><div><div class="eyebrow">NOVA / FRIENDS</div><h3>友達を追加</h3><small>名前・学校名・学年・クラスで検索</small></div><button type="button" class="nova-members-close" onclick="closeFriendAdd()">×</button></div><div class="friend-add-search"><input id="friendSearchInput" class="input" placeholder="名前や学校名を入力" autocomplete="off" oninput="searchFriendCandidates()"></div><div id="friendCandidates" class="nova-members-list"><div class="line-empty">検索すると候補が表示されます</div></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',html);
