@@ -42,7 +42,7 @@ function showBannedScreen(reason='Novaの利用規約により、このアカウ
   document.body.innerHTML='<div class="auth premium-auth"><div class="authbox glass"><div class="auth-logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div>NOVA<small>ACCOUNT STATUS</small></div></div><div class="auth-hero"><small>ACCOUNT BANNED</small><h1>このアカウントはBANされています</h1><p>'+esc(reason)+'</p><p class="sub">このアカウントではNovaを利用できません。</p></div></div></div>';
 }
 async function render(skipAuthRefresh=false){
-  if(me){startGlobalChatInbox();startGlobalFriendRequests();}if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&hasClientRole('SUPER_ADMIN'))return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他'],...(hasClientRole('SUPER_ADMIN')?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',settings:'その他'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':profileFallbackHtml()}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
+  if(me){startGlobalChatInbox();startGlobalFriendRequests();}if(!me)return renderAuth();if(!skipAuthRefresh){try{me=await api('/api/me');persistUser(me)}catch(e){if(me?.role==='SUPER_ADMIN')return renderSuperAdmin();return logout()}}if(view==='superadmin'&&hasClientRole('SUPER_ADMIN'))return renderSuperAdmin();document.body.innerHTML=`<div class="app-shell role-${String(me.role||"STUDENT").toLowerCase()}"><aside class="sidebar glass"><div class="logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div><strong>NOVA</strong><small>School Life</small></div></div><div class="side-school">${esc(me.schoolName)}</div><div class="role-badge"><span>権限レベル</span><strong>${({STUDENT:"一般ユーザー",CLASS_ADMIN:"クラス管理者",GRADE_ADMIN:"学年管理者",SCHOOL_ADMIN:"学校管理者",SUPER_ADMIN:"SUPER ADMIN"})[me.role]||me.role}</strong></div><nav>${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['board','▤','掲示板'],['settings','⋯','設定'],...(hasClientRole('SUPER_ADMIN')?[['superadmin','♜','管理']]:[])].map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav><div class="side-bottom"><button class="side-logout" onclick="logout()">↪　ログアウト</button></div></aside><main class="main"><header class="topbar"><div><small>NOVA / SCHOOL LIFE</small><h1>${({home:'ホーム',chat:'トーク',study:'学習',schedule:'予定',settings:'その他'})[view]}</h1></div><div class="top-actions"><div class="avatar">${me.icon?'<img class="avatar" src="'+esc(me.icon)+'">':profileFallbackHtml()}</div></div></header><div id="main"></div></main></div><nav class="mobile-nav glass">${[['home','⌂','ホーム'],['chat','◌','トーク'],['study','◇','学習'],['schedule','◷','予定'],['settings','⋯','その他']].map(x=>`<button onclick="go('${x[0]}')"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</nav>`;await route()}
 async function renderSuperAdmin(){
   let state={users:[],schools:[],messages:[],friends:[],posts:[],events:[],tasks:[],schedules:[],elections:[],notifications:[],calls:[]};
   try{state=await api('/api/debug/state')}catch(x){document.body.innerHTML=`<div class="auth premium-auth"><div class="authbox glass"><div class="auth-logo"><img class="nova-brand-icon" src="/icon.svg?v=5" alt=""><div>NOVA<small>SYSTEM ADMIN</small></div></div><div class="auth-hero"><small>SUPER ADMIN</small><h1>管理画面を開けませんでした</h1><p>${esc(x.message||'認証セッションを確認してください')}</p><button class="btn alt" onclick="logout()">通常ログインへ</button></div></div></div>`;return}
@@ -287,7 +287,7 @@ async function login(e){
   }catch(x){toast(x.message)}
 }
 async function go(v){view=v;await render(true)}
-async function route(){const m=$('#main');if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='settings')return settings(m);return home(m)}
+async function route(){const m=$('#main');if(view==='home')return home(m);if(view==='chat')return chat(m);if(view==='study')return study(m);if(view==='schedule')return scheduleView(m);if(view==='board')return board(m);if(view==='settings')return settings(m);return home(m)}
 let chatPollTimer=null;
 let friendRequestPollTimer=null;
 let directInboxPollTimer=null;
@@ -1245,6 +1245,37 @@ async function enableNovaPush(){
 }
 async function disableNovaPush(){
   try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(sub){await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})});await sub.unsubscribe()}toast('プッシュ通知を停止しました');settings($('#main'))}catch(e){toast(e?.message||'通知の停止に失敗しました')}
+}
+async function board(m){
+  let active='grade';
+  const renderBoard=async(kind)=>{
+    active=kind;
+    try{
+      const posts=await api('/api/posts?kind='+encodeURIComponent(kind));
+      const canPost=hasClientRole('SUPER_ADMIN')||hasClientRole('SCHOOL_ADMIN')||(kind==='grade'&&hasClientRole('GRADE_ADMIN'))||(kind==='class'&&hasClientRole('CLASS_ADMIN'));
+      const title=kind==='grade'?'学年掲示板':'学校掲示板';
+      const scopeText=kind==='grade'?String(me.grade||'')+'年の生徒・管理者が利用する掲示板':'学校全体の掲示板';
+      m.innerHTML=`<div class="board-page">
+        <div class="board-header"><div><div class="eyebrow">NOVA / BOARD</div><h1>掲示板</h1><p>${esc(scopeText)}</p></div></div>
+        <div class="board-tabs">
+          <button class="${kind==='grade'?'on':''}" onclick="boardSwitch('grade')">学年</button>
+          <button class="${kind==='school'?'on':''}" onclick="boardSwitch('school')">学校</button>
+        </div>
+        ${canPost?`<section class="glass card board-compose"><div class="settings-card-title"><b>${esc(title)}へ投稿</b><span>管理者のみ投稿できます</span></div><input id="boardTitle" class="input" placeholder="タイトル"><textarea id="boardBody" class="input" rows="4" placeholder="内容を入力"></textarea><div class="settings-actions"><button class="btn primary-btn" onclick="createBoardPost('${kind}')">投稿する</button></div></section>`:''}
+        <section class="glass card board-list"><div class="settings-card-title"><b>${esc(title)}</b><span>${posts.length}件</span></div>
+          ${posts.map(p=>`<article class="board-post"><div class="board-post-head"><b>${esc(p.title||'無題')}</b><small>${new Date(p.createdAt).toLocaleString('ja-JP')}</small></div><p>${esc(p.body||'')}</p></article>`).join('')||'<div class="home-empty">掲示板への投稿はありません</div>'}
+        </section>
+      </div>`;
+    }catch(e){toast(e.message||'掲示板を読み込めません')}
+  };
+  window._novaBoardRender=renderBoard;
+  await renderBoard(active);
+}
+function boardSwitch(kind){window._novaBoardRender?.(kind)}
+async function createBoardPost(kind){
+  const title=String($('#boardTitle')?.value||'').trim(),body=String($('#boardBody')?.value||'').trim();
+  if(!title||!body)return toast('タイトルと内容を入力してください');
+  try{await api('/api/posts',{method:'POST',body:JSON.stringify({kind,title,body})});toast('掲示板に投稿しました');await window._novaBoardRender?.(kind)}catch(e){toast(e.message||'投稿できません')}
 }
 async function settings(m){
   let schoolUsers=[];
