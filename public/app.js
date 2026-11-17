@@ -1234,7 +1234,26 @@ async function createTaskPrompt(){const title=prompt('課題名');if(!title?.tri
 async function editTask(t){const title=prompt('課題名',t.title||'');if(title===null)return;const subject=prompt('教科',t.subject||'');if(subject===null)return;const due=prompt('期限（YYYY-MM-DD、空欄で解除）',t.dueAt?new Date(t.dueAt).toISOString().slice(0,10):'');if(due===null)return;try{await api('/api/tasks/'+t.id,{method:'PATCH',body:JSON.stringify({title,subject,dueAt:due?new Date(due).getTime():null})});scheduleView($('#main'))}catch(e){toast(e.message)}}
 async function deleteTask(id2){if(!confirm('この課題を削除しますか？'))return;try{await api('/api/tasks/'+id2,{method:'DELETE'});scheduleView($('#main'))}catch(e){toast(e.message)}}
 async function toggleTask(id2){try{await api('/api/tasks/'+id2+'/complete',{method:'POST'});scheduleView($('#main'))}catch(e){toast(e.message)}}
-async function settings(m){
+async async function enableNovaPush(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))return toast('この端末・ブラウザはプッシュ通知に対応していません');
+  try{
+    const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
+    if(permission!=='granted')return toast('通知の許可が必要です');
+    const reg=await navigator.serviceWorker.ready;
+    const keyRes=await api('/api/push/vapid-public-key');
+    const raw=String(keyRes.publicKey||'').replace(/-/g,'+').replace(/_/g,'/');
+    const bin=atob(raw+'='.repeat((4-raw.length%4)%4));
+    const key=Uint8Array.from(bin,c=>c.charCodeAt(0));
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+    await api('/api/push/subscribe',{method:'POST',body:JSON.stringify({subscription:sub.toJSON()})});
+    toast('プッシュ通知を有効にしました');settings($('#main'));
+  }catch(e){console.error('NOVA_PUSH_ERROR',e);toast(e?.message||'プッシュ通知を有効にできませんでした')}
+}
+async function disableNovaPush(){
+  try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(sub){await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})});await sub.unsubscribe()}toast('プッシュ通知を停止しました');settings($('#main'))}catch(e){toast(e?.message||'通知の停止に失敗しました')}
+}
+function settings(m){
   let schoolUsers=[];
   const canSchool=hasClientRole('SCHOOL_ADMIN')||hasClientRole('SUPER_ADMIN');
   if(canSchool){try{schoolUsers=await api('/api/school/users')}catch{}}
@@ -1265,9 +1284,11 @@ async function settings(m){
         </div>
       </section>
       <section class="glass card settings-card">
-        <div class="settings-card-title"><b>通知・通話</b><span>端末通知とは別にNova側で設定</span></div>
-        <label class="setting-check"><input id="notif" type="checkbox" ${me.settings?.notifications?'checked':''}> プッシュ通知</label>
-        <label class="setting-check"><input id="call" type="checkbox" ${me.settings?.callSound?'checked':''}> 通話着信音</label>
+        <div class="settings-card-title"><b>通知・通話</b><span>アプリを開いていないときも通知できます</span></div>
+        <label class="setting-check"><input id="notif" type="checkbox" ${me.settings?.notifications?'checked':''}> プッシュ通知を受け取る</label>
+        <label class="setting-check"><input id="call" type="checkbox" ${me.settings?.callSound?'checked':''}> 通話着信通知を受け取る</label>
+        <div class="push-settings-row"><button type="button" class="btn alt" onclick="enableNovaPush()">端末の通知を有効にする</button><button type="button" class="btn alt" onclick="disableNovaPush()">通知を停止</button></div>
+        <div class="sub" style="margin-top:8px">iPhone・iPadはホーム画面にNovaを追加したあと、通知を許可してください。</div>
       </section>
       <div class="settings-actions"><button class="btn primary-btn" type="submit">変更を保存</button></div>
     </form>
