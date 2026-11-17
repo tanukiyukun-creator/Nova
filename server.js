@@ -64,6 +64,8 @@ async function sendPushNotification(userId,payload){
   if(!webPushReady)return;
   try{
     const db=load(),u=db.users.find(x=>String(x.id)===String(userId));
+    if(u?.settings?.notifications===false)return;
+    if(payload?.data?.type==='call'&&u?.settings?.callSound===false)return;
     const subs=Array.isArray(u?.pushSubscriptions)?u.pushSubscriptions:[];
     for(const sub of subs){
       try{await webpush.sendNotification(sub,JSON.stringify(payload))}
@@ -747,7 +749,7 @@ wss.on('connection',(ws,req)=>{
         if(target?.readyState===1)target.send(JSON.stringify(payload));
         else{
           queueCallSignal(m.toUserId,payload);
-          if(m.action==='offer')notify(load(),m.toUserId,'call','着信',u.displayName+'から'+(m.mode==='video'?'ビデオ通話':'音声通話')+'の着信があります',{fromId:u.id,callId:m.callId,mode:m.mode,chatType:'call'});
+          if(m.action==='offer'){const db=load();notify(db,m.toUserId,'call','着信',u.displayName+'から'+(m.mode==='video'?'ビデオ通話':'音声通話')+'の着信があります',{fromId:u.id,callId:m.callId,mode:m.mode,chatType:'call'});save(db)}
         }
       }else if(m.type==='call_signal'&&Array.isArray(m.toUserIds)){
         const payload={...m,fromUserId:u.id};
@@ -756,7 +758,7 @@ wss.on('connection',(ws,req)=>{
           if(target?.readyState===1)target.send(JSON.stringify(payload));
           else{
             queueCallSignal(id,payload);
-            if(m.action==='offer')notify(load(),id,'call','着信',u.displayName+'から'+(m.mode==='video'?'ビデオ通話':'音声通話')+'の着信があります',{fromId:u.id,callId:m.callId,mode:m.mode,chatType:'call'});
+            if(m.action==='offer'){const db=load();notify(db,id,'call','着信',u.displayName+'から'+(m.mode==='video'?'ビデオ通話':'音声通話')+'の着信があります',{fromId:u.id,callId:m.callId,mode:m.mode,chatType:'call'});save(db)}
           }
         });
       }
