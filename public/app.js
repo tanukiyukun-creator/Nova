@@ -1350,6 +1350,7 @@ async function settings(m){
     </form>
     <section class="glass card settings-card legal-settings-card"><div class="settings-card-title"><b>利用規約・プライバシー</b><span>いつでも確認できます</span></div><div class="legal-settings-actions"><button type="button" class="btn alt" onclick="showLegalDocument('terms')">利用規約を見る</button><button type="button" class="btn alt" onclick="showLegalDocument('privacy')">プライバシーポリシーを見る</button></div></section>
     ${schoolManage}
+    <section class="glass card settings-card mobile-account-actions"><div class="settings-card-title"><b>アカウント操作</b><span>管理者機能・ログアウト</span></div><div class="settings-actions"><button type="button" class="btn alt" onclick="${hasClientRole('SUPER_ADMIN')?"go('superadmin')":"adminPanel()"}">${hasClientRole('SUPER_ADMIN')?'管理画面':'管理'}</button><button type="button" class="btn danger" onclick="logout()">ログアウト</button></div></section>
   </div>`
 }
 async function moveSchoolUserPrompt(id){
