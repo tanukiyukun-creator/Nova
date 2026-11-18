@@ -192,8 +192,10 @@ function ensureAdminTalkMembership(u,db){
     if(allowed){t.memberIds=t.memberIds.filter(x=>allowed.includes(x));allowed.forEach(x=>{if(!t.memberIds.includes(x))t.memberIds.push(x)})}
     return t;
   };
-  const classAllowed=db.users.filter(x=>sameGroup(x,u)&&(hasRole(x,'CLASS_ADMIN')||hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
-  const gradeAllowed=db.users.filter(x=>x.schoolId===u.schoolId&&(hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
+  // SUPER_ADMIN is a global management account and must never be a member of
+  // CLASS ADMIN / GRADE ADMIN talks, even if stale adminRoles contain those roles.
+  const classAllowed=db.users.filter(x=>!hasRole(x,'SUPER_ADMIN')&&sameGroup(x,u)&&(hasRole(x,'CLASS_ADMIN')||hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
+  const gradeAllowed=db.users.filter(x=>!hasRole(x,'SUPER_ADMIN')&&x.schoolId===u.schoolId&&(hasRole(x,'GRADE_ADMIN')||hasRole(x,'SCHOOL_ADMIN'))).map(x=>x.id);
   ensure('classadmin',u.grade,u.className,classAllowed);
   ensure('gradeadmin',null,null,gradeAllowed);
 }
