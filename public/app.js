@@ -1342,7 +1342,7 @@ async function board(m){
         </div>
         ${canPost?`<section class="glass card board-compose"><div class="settings-card-title"><b>${esc(title)}へ投稿</b><span>管理者のみ投稿できます</span></div><input id="boardTitle" class="input" placeholder="タイトル"><textarea id="boardBody" class="input" rows="4" placeholder="内容を入力"></textarea><div class="settings-actions"><button class="btn primary-btn" onclick="createBoardPost('${kind}')">投稿する</button></div></section>`:''}
         <section class="glass card board-list"><div class="settings-card-title"><b>${esc(title)}</b><span>${posts.length}件</span></div>
-          ${posts.map(p=>`<article class="board-post"><div class="board-post-head"><b>${esc(p.title||'無題')}</b><small>${new Date(p.createdAt).toLocaleString('ja-JP')}</small></div><p>${esc(p.body||'')}</p></article>`).join('')||'<div class="home-empty">掲示板への投稿はありません</div>'}
+          ${posts.map(p=>`<article class="board-post"><div class="board-post-head"><b>${esc(p.title||'無題')}</b><small>${new Date(p.createdAt).toLocaleString('ja-JP')}</small></div><p>${esc(p.body||'')}</p>${(String(p.authorId)===String(me.id)||hasClientRole('SUPER_ADMIN')||hasClientRole('SCHOOL_ADMIN')||hasClientRole('GRADE_ADMIN')||hasClientRole('CLASS_ADMIN'))?`<div class="settings-actions"><button class="ban-btn" onclick="deleteBoardPost('${p.id}','${kind}')">投稿を削除</button></div>`:''}</article>`).join('')||'<div class="home-empty">掲示板への投稿はありません</div>'}
         </section>
       </div>`;
     }catch(e){toast(e.message||'掲示板を読み込めません')}
@@ -1351,6 +1351,7 @@ async function board(m){
   await renderBoard(active);
 }
 function boardSwitch(kind){window._novaBoardRender?.(kind)}
+async function deleteBoardPost(id,kind){if(!confirm('この投稿を削除しますか？'))return;try{await api('/api/posts/'+encodeURIComponent(id),{method:'DELETE'});toast('投稿を削除しました');await window._novaBoardRender?.(kind)}catch(e){toast(e.message||'投稿を削除できません')}}
 async function createBoardPost(kind){
   const title=String($('#boardTitle')?.value||'').trim(),body=String($('#boardBody')?.value||'').trim();
   if(!title||!body)return toast('タイトルと内容を入力してください');
