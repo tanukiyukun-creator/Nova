@@ -61,21 +61,27 @@ function pushConfigured(){return !!(process.env.NOVA_VAPID_PUBLIC_KEY&&process.e
 function configureWebPush(){if(!pushConfigured())return false;try{webpush.setVapidDetails(process.env.NOVA_VAPID_SUBJECT||'mailto:admin@example.com',process.env.NOVA_VAPID_PUBLIC_KEY,process.env.NOVA_VAPID_PRIVATE_KEY);return true}catch(e){console.error('WEB_PUSH_CONFIG_ERROR',e);return false}}
 const webPushReady=configureWebPush();
 async function sendPushNotification(userId,payload){
-  if(!webPushReady)return;
-  try{
-    const db=load(),u=db.users.find(x=>String(x.id)===String(userId));
-    if(u?.settings?.notifications===false)return;
-    if(payload?.data?.type==='call'&&u?.settings?.callSound===false)return;
-    const subs=Array.isArray(u?.pushSubscriptions)?u.pushSubscriptions:[];
-    for(const sub of subs){
-      try{await webpush.sendNotification(sub,JSON.stringify(payload))}
-      catch(e){
-        if(e?.statusCode===404||e?.statusCode===410){
-          u.pushSubscriptions=subs.filter(x=>x.endpoint!==sub.endpoint);save(db);
-        }
+  if(!webPushReady)throw new Error('プッシュ通知のサーバー設定が未完了です');
+  const db=load(),u=db.users.find(x=>String(x.id)===String(userId));
+  if(!u)throw new Error('通知先ユーザーが見つかりません');
+  if(u?.settings?.notifications===false)throw new Error('プッシュ通知がOFFです');
+  if(payload?.data?.type==='call'&&u?.settings?.callSound===false)throw new Error('通話着信通知がOFFです');
+  const subs=Array.isArray(u?.pushSubscriptions)?u.pushSubscriptions:[];
+  if(!subs.length)throw new Error('この端末のプッシュ購読が登録されていません。通知設定を一度OFF→ONにしてください');
+  const errors=[];
+  for(const sub of subs){
+    try{
+      await webpush.sendNotification(sub,JSON.stringify(payload));
+    }catch(e){
+      console.error('WEB_PUSH_SEND_ERROR',e?.statusCode,e?.body||e?.message);
+      if(e?.statusCode===404||e?.statusCode===410){
+        u.pushSubscriptions=subs.filter(x=>x.endpoint!==sub.endpoint);save(db);
       }
+      errors.push(e);
     }
-  }catch(e){console.error('WEB_PUSH_SEND_ERROR',e)}
+  }
+  if(errors.length===subs.length)throw new Error('プッシュ通知の送信に失敗しました。ブラウザの通知購読を作り直してください');
+  return {sent:subs.length-errors.length,failed:errors.length};
 }
 function notify(db,userId,type,title,body,meta={}){
   const n={id:id(),userId,type,title,body,...meta,read:false,createdAt:Date.now()};
@@ -424,9 +430,12 @@ app.post('/api/push/unsubscribe',auth,(req,res)=>{
 app.post('/api/push/test',auth,async(req,res)=>{
   if(!webPushReady)return res.status(503).json({error:'プッシュ通知のサーバー設定が未完了です'});
   try{
-    await sendPushNotification(req.user.id,{title:'Novaテスト通知',body:'プッシュ通知が正常に届いています',data:{type:'test',chatType:'test'}});
-    res.json({ok:true});
-  }catch(e){res.status(500).json({error:'テスト通知の送信に失敗しました'})}
+    const result=await sendPushNotification(req.user.id,{title:'Novaテスト通知',body:'プッシュ通知が正常に届いています',data:{type:'test',chatType:'test'}});
+    res.json({ok:true,...result});
+  }catch(e){
+    console.error('WEB_PUSH_TEST_ERROR',e?.message);
+    res.status(500).json({error:e?.message||'テスト通知の送信に失敗しました'});
+  }
 });
 app.get('/api/notifications',auth,(req,res)=>{const db=load();res.json(db.notifications.filter(n=>n.userId===req.user.id).slice(0,100))});
 app.post('/api/notifications/read',auth,(req,res)=>{const db=load();db.notifications.filter(n=>n.userId===req.user.id).forEach(n=>n.read=true);save(db);res.json({ok:true})});
