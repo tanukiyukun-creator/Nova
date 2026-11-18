@@ -16,7 +16,7 @@ self.addEventListener('push',event=>{
     data:data.data||{}
   };
   event.waitUntil((async()=>{
-    try{const clientsList=await self.clients.matchAll({type:'window',includeUncontrolled:true});if(clientsList.length&&data.data?.type!=='call')return;}catch{}
+    try{const clientsList=await self.clients.matchAll({type:'window',includeUncontrolled:true});const visible=clientsList.some(c=>c.visibilityState==='visible');if(visible&&data.data?.type!=='call')return;}catch{}
     await self.registration.showNotification(title,options);
   })());
 });
