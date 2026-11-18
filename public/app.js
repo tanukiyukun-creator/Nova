@@ -1391,8 +1391,7 @@ async function settings(m){
         <div class="settings-card-title"><b>通知・通話</b><span>アプリを開いていないときも通知できます</span></div>
         <label class="setting-check"><input id="notif" type="checkbox" ${me.settings?.notifications?'checked':''}> プッシュ通知を受け取る</label>
         <label class="setting-check"><input id="call" type="checkbox" ${me.settings?.callSound?'checked':''}> 通話着信通知を受け取る</label>
-        <div class="push-settings-row"><button type="button" class="btn alt" onclick="enableNovaPush()">端末の通知を有効にする</button><button type="button" class="btn alt" onclick="disableNovaPush()">通知を停止</button><button type="button" class="btn alt" onclick="testNovaPush()">テスト通知</button></div>
-        <div class="sub" style="margin-top:8px">iPhone・iPadはホーム画面にNovaを追加したあと、通知を許可してください。</div>
+        
       </section>
       <div class="settings-actions"><button class="btn primary-btn" type="submit">変更を保存</button></div>
     </form>
