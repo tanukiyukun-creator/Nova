@@ -2,6 +2,7 @@ import express from 'express';
 import {createServer} from 'http';
 import {WebSocketServer} from 'ws';
 import crypto from 'crypto';
+import pg from 'pg';
 import webpush from 'web-push';
 import fs from 'fs';
 import path from 'path';
@@ -25,36 +26,101 @@ migrateLegacyFile(DB,path.join(__dirname,'db.json'));
 migrateLegacyFile(DIRECT_DB,path.join(__dirname,'direct-messages.json'));
 const empty={users:[],schools:[],messages:[],classTalks:[],talks:[],friends:[],friendRequests:[],posts:[],events:[],tasks:[],taskCompletions:[],schedules:[],scheduleChanges:[],elections:[],notifications:[],calls:[]};
 const SCHOOL_STARTER=['早稲田大学高等学院','早稲田実業学校高等部','慶應義塾高等学校','開成高等学校','筑波大学附属高等学校','東京学芸大学附属高等学校','日比谷高等学校','浦和高等学校','浦和第一女子高等学校','川越高等学校','川越女子高等学校','川越東高等学校','熊谷高等学校','山村学園高等学校','山村国際高等学校','大宮高等学校','所沢高等学校','春日部高等学校','越谷北高等学校','栄東高等学校','淑徳与野高等学校','明治大学付属明治高等学校','青山学院高等部','中央大学附属高等学校','立教新座高等学校'];
-function load(){
+const {Pool}=pg;
+let persistentPool=null;
+let persistentDb=null;
+let persistentDirectMessages=null;
+let persistentWriteQueue=Promise.resolve();
+const DATABASE_URL=String(process.env.DATABASE_URL||process.env.NOVA_DATABASE_URL||'').trim();
+
+function normalizeDb(db){
+  const out=db&&typeof db==='object'?db:{};
+  for(const k of Object.keys(empty)) if(!Array.isArray(out[k])) out[k]=[];
+  return out;
+}
+function loadFileDb(){
   if(!fs.existsSync(DB)) fs.writeFileSync(DB,JSON.stringify(empty,null,2));
-  let db;
-  try{
-    db=JSON.parse(fs.readFileSync(DB,'utf8'));
-  }catch(e){
+  try{return normalizeDb(JSON.parse(fs.readFileSync(DB,'utf8')))}catch(e){
     console.error('DB_READ_ERROR',e);
     throw new Error('データベースを読み込めません');
   }
-  for(const k of Object.keys(empty)) if(!Array.isArray(db[k])) db[k]=[];
-  return db;
+}
+function loadFileDirectMessages(){
+  if(!fs.existsSync(DIRECT_DB)) fs.writeFileSync(DIRECT_DB,'[]');
+  try{const rows=JSON.parse(fs.readFileSync(DIRECT_DB,'utf8'));return Array.isArray(rows)?rows:[]}catch{return []}
 }
 function atomicWrite(file,data){
   const tmp=file+'.'+process.pid+'.'+crypto.randomBytes(6).toString('hex')+'.tmp';
   fs.writeFileSync(tmp,data);
   fs.renameSync(tmp,file);
 }
+function queuePersistentWrite(kind,data){
+  if(!persistentPool)return;
+  const snapshot=JSON.stringify(data);
+  persistentWriteQueue=persistentWriteQueue.then(async()=>{
+    try{
+      if(kind==='db') await persistentPool.query('INSERT INTO nova_store (id,data,updated_at) VALUES (1,$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data,updated_at=NOW()',[snapshot]);
+      else await persistentPool.query('INSERT INTO nova_direct_store (id,data,updated_at) VALUES (1,$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data,updated_at=NOW()',[snapshot]);
+    }catch(e){console.error('NOVA_PERSIST_WRITE_ERROR',e?.message||e)}
+  }).catch(e=>console.error('NOVA_PERSIST_QUEUE_ERROR',e?.message||e));
+}
+async function initPersistentStore(){
+  if(!DATABASE_URL){
+    console.warn('NOVA_PERSISTENCE=FILE_ONLY (DATABASE_URL is not set)');
+    return;
+  }
+  try{
+    persistentPool=new Pool({connectionString:DATABASE_URL,ssl:process.env.NODE_ENV==='production'?{rejectUnauthorized:false}:undefined,max:5,idleTimeoutMillis:30000,connectionTimeoutMillis:10000});
+    await persistentPool.query('CREATE TABLE IF NOT EXISTS nova_store (id INTEGER PRIMARY KEY,data JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())');
+    await persistentPool.query('CREATE TABLE IF NOT EXISTS nova_direct_store (id INTEGER PRIMARY KEY,data JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())');
+    const main=await persistentPool.query('SELECT data FROM nova_store WHERE id=1');
+    if(main.rows.length){
+      persistentDb=normalizeDb(main.rows[0].data);
+      atomicWrite(DB,JSON.stringify(persistentDb,null,2));
+      console.log('NOVA_PERSISTENCE=POSTGRES (main data loaded)');
+    }else{
+      persistentDb=loadFileDb();
+      await persistentPool.query('INSERT INTO nova_store (id,data) VALUES (1,$1::jsonb)',[JSON.stringify(persistentDb)]);
+      console.log('NOVA_PERSISTENCE=POSTGRES (main data migrated)');
+    }
+    const direct=await persistentPool.query('SELECT data FROM nova_direct_store WHERE id=1');
+    if(direct.rows.length){
+      persistentDirectMessages=Array.isArray(direct.rows[0].data)?direct.rows[0].data:[];
+      atomicWrite(DIRECT_DB,JSON.stringify(persistentDirectMessages,null,2));
+    }else{
+      persistentDirectMessages=loadFileDirectMessages();
+      await persistentPool.query('INSERT INTO nova_direct_store (id,data) VALUES (1,$1::jsonb)',[JSON.stringify(persistentDirectMessages)]);
+    }
+  }catch(e){
+    console.error('NOVA_PERSISTENCE_ERROR',e?.message||e);
+    try{await persistentPool?.end()}catch{}
+    persistentPool=null;
+    persistentDb=null;
+    persistentDirectMessages=null;
+    console.warn('NOVA_PERSISTENCE_FALLBACK=FILE_ONLY');
+  }
+}
+function load(){
+  if(persistentDb)return persistentDb;
+  return loadFileDb();
+}
 function save(db){
-  atomicWrite(DB,JSON.stringify(db,null,2));
+  const normalized=normalizeDb(db);
+  if(persistentDb===db||persistentPool){persistentDb=normalized;queuePersistentWrite('db',normalized)}
+  atomicWrite(DB,JSON.stringify(normalized,null,2));
 }
 let directMessagesCache=null;
 function loadDirectMessages(){
+  if(Array.isArray(persistentDirectMessages))return persistentDirectMessages;
   if(Array.isArray(directMessagesCache))return directMessagesCache;
-  if(!fs.existsSync(DIRECT_DB)) fs.writeFileSync(DIRECT_DB,'[]');
-  try{const rows=JSON.parse(fs.readFileSync(DIRECT_DB,'utf8'));directMessagesCache=Array.isArray(rows)?rows:[]}catch{directMessagesCache=[]}
+  directMessagesCache=loadFileDirectMessages();
   return directMessagesCache;
 }
 function saveDirectMessages(rows){
   directMessagesCache=Array.isArray(rows)?rows:[];
+  if(persistentPool)persistentDirectMessages=directMessagesCache;
   atomicWrite(DIRECT_DB,JSON.stringify(directMessagesCache,null,2));
+  if(persistentPool)queuePersistentWrite('direct',directMessagesCache);
 }
 function migrateDirectMessages(){
   const rows=loadDirectMessages();
@@ -897,6 +963,7 @@ function promoteOwnerToSuperAdmin(){
     console.error('SUPER_ADMIN_OWNER_PROMOTE_ERROR',e);
   }
 }
+await initPersistentStore();
 promoteOwnerToSuperAdmin();
 try{const db=load();if(ensureYamamura1Class5Schedule(db))save(db)}catch(e){console.error('YAMAMURA_1_5_SCHEDULE_PRESET_ERROR',e)}
 const wsUsers=new Map();
