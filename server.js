@@ -14,6 +14,15 @@ const DATA_DIR=process.env.NOVA_DATA_DIR||path.join(__dirname,'data-store');
 fs.mkdirSync(DATA_DIR,{recursive:true});
 const DB=process.env.NOVA_DB_PATH||path.join(DATA_DIR,'db.json');
 const DIRECT_DB=process.env.NOVA_DIRECT_DB_PATH||path.join(DATA_DIR,'direct-messages.json');
+function migrateLegacyFile(target,legacy){
+  if(fs.existsSync(target)||!fs.existsSync(legacy))return;
+  try{
+    fs.copyFileSync(legacy,target);
+    console.log('NOVA_DATA_MIGRATED',legacy,'->',target);
+  }catch(e){console.error('NOVA_DATA_MIGRATION_ERROR',e)}
+}
+migrateLegacyFile(DB,path.join(__dirname,'db.json'));
+migrateLegacyFile(DIRECT_DB,path.join(__dirname,'direct-messages.json'));
 const empty={users:[],schools:[],messages:[],classTalks:[],talks:[],friends:[],friendRequests:[],posts:[],events:[],tasks:[],taskCompletions:[],schedules:[],scheduleChanges:[],elections:[],notifications:[],calls:[]};
 const SCHOOL_STARTER=['早稲田大学高等学院','早稲田実業学校高等部','慶應義塾高等学校','開成高等学校','筑波大学附属高等学校','東京学芸大学附属高等学校','日比谷高等学校','浦和高等学校','浦和第一女子高等学校','川越高等学校','川越女子高等学校','川越東高等学校','熊谷高等学校','山村学園高等学校','山村国際高等学校','大宮高等学校','所沢高等学校','春日部高等学校','越谷北高等学校','栄東高等学校','淑徳与野高等学校','明治大学付属明治高等学校','青山学院高等部','中央大学附属高等学校','立教新座高等学校'];
 function load(){
