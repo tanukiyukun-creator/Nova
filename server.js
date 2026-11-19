@@ -37,10 +37,13 @@ function load(){
   for(const k of Object.keys(empty)) if(!Array.isArray(db[k])) db[k]=[];
   return db;
 }
+function atomicWrite(file,data){
+  const tmp=file+'.'+process.pid+'.'+crypto.randomBytes(6).toString('hex')+'.tmp';
+  fs.writeFileSync(tmp,data);
+  fs.renameSync(tmp,file);
+}
 function save(db){
-  const tmp=DB+'.tmp';
-  fs.writeFileSync(tmp,JSON.stringify(db,null,2));
-  fs.renameSync(tmp,DB);
+  atomicWrite(DB,JSON.stringify(db,null,2));
 }
 let directMessagesCache=null;
 function loadDirectMessages(){
@@ -51,9 +54,7 @@ function loadDirectMessages(){
 }
 function saveDirectMessages(rows){
   directMessagesCache=Array.isArray(rows)?rows:[];
-  const tmp=DIRECT_DB+'.tmp';
-  fs.writeFileSync(tmp,JSON.stringify(directMessagesCache,null,2));
-  fs.renameSync(tmp,DIRECT_DB);
+  atomicWrite(DIRECT_DB,JSON.stringify(directMessagesCache,null,2));
 }
 function migrateDirectMessages(){
   const rows=loadDirectMessages();
